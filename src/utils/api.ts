@@ -7,6 +7,58 @@ const API_BASE = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
   : "";
 
+export async function registerAccount(
+  identifier: string,
+  password: string,
+): Promise<{
+  success: boolean;
+  message: string;
+  email?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier, password }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch {
+    return {
+      success: false,
+      message:
+        "Could not connect to authentication server. Please check your network.",
+    };
+  }
+}
+
+export async function loginAccount(
+  identifier: string,
+  password: string,
+): Promise<{
+  success: boolean;
+  message: string;
+  email?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier, password }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch {
+    return {
+      success: false,
+      message:
+        "Could not connect to authentication server. Please check your network.",
+    };
+  }
+}
+
 export async function sendLoginCode(email: string): Promise<{
   success: boolean;
   message: string;

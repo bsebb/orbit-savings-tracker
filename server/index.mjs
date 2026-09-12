@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Redis } from '@upstash/redis';
 import { sendOtpEmail } from './mailer.mjs';
@@ -68,6 +69,42 @@ async function deleteOtp(email) {
   }
 }
 
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return { salt, hash };
+}
+
+function verifyPassword(password, salt, storedHash) {
+  try {
+    const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+    const hashBuf = Buffer.from(hash, 'hex');
+    const storedBuf = Buffer.from(storedHash, 'hex');
+    if (hashBuf.length !== storedBuf.length) return false;
+    return crypto.timingSafeEqual(hashBuf, storedBuf);
+  } catch {
+    return false;
+  }
+}
+
+async function getUserAuth(identifier) {
+  if (redis) {
+    const raw = await redis.get(`auth:${identifier}`);
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } else {
+    return memoryStore.get(`auth:${identifier}`) || null;
+  }
+}
+
+async function setUserAuth(identifier, authData) {
+  if (redis) {
+    await redis.set(`auth:${identifier}`, JSON.stringify(authData));
+  } else {
+    memoryStore.set(`auth:${identifier}`, authData);
+  }
+}
+
 // ─── API Endpoints ────────────────────────────────────────────────────────────
 
 /**
@@ -81,6 +118,106 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     redis: redis ? 'upstash-connected' : 'in-memory-fallback',
   });
+});
+
+/**
+ * Register account with Email/Username + Password
+ */
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { identifier, email, password } = req.body;
+    const rawId = (identifier || email || '').trim().toLowerCase();
+
+    if (!rawId || rawId.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username or email must be at least 3 characters',
+      });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      });
+    }
+
+    const existing = await getUserAuth(rawId);
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email/username already exists. Please sign in.',
+      });
+    }
+
+    const { salt, hash } = hashPassword(password);
+    await setUserAuth(rawId, {
+      identifier: rawId,
+      salt,
+      hash,
+      createdAt: new Date().toISOString(),
+    });
+
+    console.log(`👤 New user registered: ${rawId}`);
+    res.status(201).json({
+      success: true,
+      email: rawId,
+      message: 'Account registered successfully',
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error during registration' });
+  }
+});
+
+/**
+ * Sign in with Email/Username + Password
+ */
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { identifier, email, password } = req.body;
+    const rawId = (identifier || email || '').trim().toLowerCase();
+
+    if (!rawId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email or username is required',
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+      });
+    }
+
+    const user = await getUserAuth(rawId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found. Please click "Create Account" first.',
+      });
+    }
+
+    const isValid = verifyPassword(password, user.salt, user.hash);
+    if (!isValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password. Please try again.',
+      });
+    }
+
+    console.log(`🔓 User signed in: ${rawId}`);
+    res.json({
+      success: true,
+      email: rawId,
+      message: 'Signed in successfully',
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error during login' });
+  }
 });
 
 /**

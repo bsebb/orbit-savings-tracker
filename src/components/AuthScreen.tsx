@@ -1,128 +1,93 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useFinance } from "../context/FinanceContext";
-import { sendLoginCode, verifyLoginCode } from "../utils/api";
+import { loginAccount, registerAccount } from "../utils/api";
 import {
-  Mail,
+  User,
+  Lock,
+  Eye,
+  EyeOff,
   ArrowRight,
   ShieldCheck,
   Sparkles,
-  KeyRound,
-  ChevronLeft,
-  Check,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
 export const AuthScreen = () => {
   const { login } = useFinance();
-  const [step, setStep] = useState<"email" | "code">("email");
-  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<"signin" | "register">("signin");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(30);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Generate and request email dispatch from backend
-  const generateAndSendCode = async (targetEmail: string) => {
-    setDigits(["", "", "", "", "", ""]);
-    setCountdown(30);
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      toast.error("Please enter your email or username");
+      return;
+    }
+    if (!password) {
+      toast.error("Please enter your password");
+      return;
+    }
+
     setLoading(true);
-
     try {
-      const res = await sendLoginCode(targetEmail);
+      const res = await loginAccount(cleanId, password);
       if (res.success) {
-        toast.success(`Verification code sent to ${targetEmail}`, {
-          description:
-            "Check your inbox (and spam folder) for your 6-digit code.",
-        });
+        login(res.email || cleanId, remember);
+        toast.success(`Welcome back, ${res.email || cleanId}!`, { icon: "✨" });
       } else {
-        toast.error(res.message || "Failed to send verification code");
+        toast.error(
+          res.message || "Failed to sign in. Please check your credentials.",
+        );
       }
     } catch {
-      toast.error("Network error requesting verification code");
+      toast.error("Network error while attempting to sign in");
     } finally {
       setLoading(false);
     }
   };
 
-  // Timer countdown for resend
-  useEffect(() => {
-    if (step === "code" && countdown > 0) {
-      const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [step, countdown]);
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      toast.error("Please enter a valid email address");
+    const cleanId = identifier.trim();
+    if (!cleanId || cleanId.length < 3) {
+      toast.error("Username or email must be at least 3 characters");
+      return;
+    }
+    if (!password || password.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match. Please re-enter.");
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      toast.error("Please enter a valid email format (e.g. name@example.com)");
-      return;
-    }
-
-    setStep("code");
-    await generateAndSendCode(cleanEmail);
-  };
-
-  const handleDigitChange = (index: number, val: string) => {
-    // Handle paste of 6 digits
-    if (val.length > 1) {
-      const pasted = val.replace(/\D/g, "").slice(0, 6);
-      if (pasted.length === 6) {
-        const newDigits = pasted.split("");
-        setDigits(newDigits);
-        handleVerify(pasted);
-        return;
-      }
-    }
-
-    const char = val.slice(-1);
-    const newDigits = [...digits];
-    newDigits[index] = char;
-    setDigits(newDigits);
-
-    // Move to next input
-    if (char && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto verify when 6th digit entered
-    if (newDigits.every((d) => d !== "")) {
-      handleVerify(newDigits.join(""));
-    }
-  };
-
-  const handleKeyDown = (
-    index: number,
-    e: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (e.key === "Backspace" && !digits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerify = async (enteredCode: string) => {
     setLoading(true);
     try {
-      const res = await verifyLoginCode(email.trim(), enteredCode);
+      const res = await registerAccount(cleanId, password);
       if (res.success) {
-        login(email.trim(), remember);
-        toast.success(`Welcome to Orbit, ${email.trim()}!`, { icon: "✨" });
+        login(res.email || cleanId, remember);
+        toast.success(
+          `Account created! Welcome to Orbit, ${res.email || cleanId}!`,
+          {
+            icon: "🎉",
+          },
+        );
       } else {
-        toast.error(res.message || "Invalid or expired verification code.");
-        setDigits(["", "", "", "", "", ""]);
-        inputRefs.current[0]?.focus();
+        toast.error(res.message || "Registration failed. Please try again.");
       }
     } catch {
-      toast.error("Verification error. Please retry.");
+      toast.error("Network error while creating account");
     } finally {
       setLoading(false);
     }
@@ -143,7 +108,7 @@ export const AuthScreen = () => {
         {/* Orbit Brand Header */}
         <div className="relative z-10 mb-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 to-purple-500 text-white shadow-xl shadow-indigo-500/30 mb-4">
-            {step === "email" ? <Sparkles size={32} /> : <KeyRound size={30} />}
+            <Sparkles size={32} />
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             Orbit
@@ -153,143 +118,281 @@ export const AuthScreen = () => {
           </p>
         </div>
 
+        {/* Segmented Tab Switcher */}
+        <div className="relative z-10 flex p-1 bg-gray-100/80 dark:bg-gray-800/80 rounded-2xl mb-6 border border-gray-200/50 dark:border-gray-700/50">
+          <button
+            type="button"
+            onClick={() => setMode("signin")}
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              mode === "signin"
+                ? "bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <LogIn size={14} />
+            <span>Sign In</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("register")}
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              mode === "register"
+                ? "bg-white dark:bg-gray-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <UserPlus size={14} />
+            <span>Create Account</span>
+          </button>
+        </div>
+
         <AnimatePresence mode="wait">
-          {step === "email" ? (
-            <motion.div
-              key="email-step"
-              initial={{ opacity: 0, x: -15 }}
+          {mode === "signin" ? (
+            <motion.form
+              key="signin-form"
+              initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 15 }}
-              transition={{ duration: 0.2 }}
-              className="relative z-10 space-y-5 text-left"
+              exit={{ opacity: 0, x: 12 }}
+              transition={{ duration: 0.18 }}
+              onSubmit={handleSignIn}
+              className="relative z-10 space-y-4 text-left"
             >
-              <p className="text-sm text-gray-600 dark:text-gray-300 text-center -mt-2 mb-2">
-                Enter your email address to receive a secure login code.
-              </p>
-
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400 mb-2 pl-1">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      size={18}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                    />
-                    <input
-                      type="email"
-                      autoFocus
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      className="w-full bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Remember this device checkbox */}
-                <label className="flex items-center gap-2.5 px-1 py-1 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 cursor-pointer"
-                  />
-                  <div className="text-xs text-gray-600 dark:text-gray-300">
-                    <span className="font-semibold">Remember this device</span>
-                    <span className="block text-[11px] text-gray-400">
-                      Keep me signed in for 4 years
-                    </span>
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400 mb-1.5 pl-1">
+                  Email or Username
                 </label>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-2xl text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50"
-                >
-                  {loading ? (
-                    <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <span>Send Login Code</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </form>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="code-step"
-              initial={{ opacity: 0, x: 15 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -15 }}
-              transition={{ duration: 0.2 }}
-              className="relative z-10 space-y-5"
-            >
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  Enter the 6-digit code
-                </p>
-                <p className="text-xs text-gray-400">
-                  Sent to{" "}
-                  <span className="font-semibold text-indigo-500">{email}</span>
-                </p>
-              </div>
-
-              {/* 6 Digit Inputs */}
-              <div className="flex justify-center gap-2 sm:gap-2.5">
-                {digits.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    ref={(el) => {
-                      inputRefs.current[idx] = el;
-                    }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={idx === 0 ? 6 : 1}
-                    value={digit}
-                    autoFocus={idx === 0}
-                    onChange={(e) => handleDigitChange(idx, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(idx, e)}
-                    className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold font-mono bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900 dark:text-white shadow-sm transition-all"
+                <div className="relative">
+                  <User
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                   />
-                ))}
+                  <input
+                    type="text"
+                    autoFocus
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="Enter email or username"
+                    required
+                    className="w-full bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setStep("email")}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 flex items-center gap-1 font-semibold"
-                >
-                  <ChevronLeft size={14} /> Change email
-                </button>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400 mb-1.5 pl-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    className="w-full bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
 
+              {/* Remember this device */}
+              <label className="flex items-center gap-2.5 px-1 py-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 cursor-pointer"
+                />
+                <div className="text-xs text-gray-600 dark:text-gray-300">
+                  <span className="font-semibold">Remember this device</span>
+                  <span className="block text-[11px] text-gray-400">
+                    Stay logged in on this browser
+                  </span>
+                </div>
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-2xl text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? (
+                  <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
                 <button
                   type="button"
-                  disabled={countdown > 0}
-                  onClick={() => generateAndSendCode(email)}
-                  className={`font-semibold ${
-                    countdown > 0
-                      ? "text-gray-400 cursor-not-allowed"
-                      : "text-indigo-600 dark:text-indigo-400 hover:underline"
-                  }`}
+                  onClick={() => setMode("register")}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                 >
-                  {countdown > 0 ? `Resend in ${countdown}s` : "Resend code"}
+                  Don't have an account? Create one
                 </button>
               </div>
-            </motion.div>
+            </motion.form>
+          ) : (
+            <motion.form
+              key="register-form"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.18 }}
+              onSubmit={handleRegister}
+              className="relative z-10 space-y-4 text-left"
+            >
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400 mb-1.5 pl-1">
+                  Email or Username
+                </label>
+                <div className="relative">
+                  <User
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type="text"
+                    autoFocus
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="Choose a username or email"
+                    required
+                    className="w-full bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400 mb-1.5 pl-1">
+                  Password (min 6 chars)
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Choose a secure password"
+                    required
+                    className="w-full bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-400 mb-1.5 pl-1">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock
+                    size={18}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter your password"
+                    required
+                    className="w-full bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={16} />
+                    ) : (
+                      <Eye size={16} />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember this device */}
+              <label className="flex items-center gap-2.5 px-1 py-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 cursor-pointer"
+                />
+                <div className="text-xs text-gray-600 dark:text-gray-300">
+                  <span className="font-semibold">Remember this device</span>
+                  <span className="block text-[11px] text-gray-400">
+                    Stay logged in on this browser
+                  </span>
+                </div>
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-2xl text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? (
+                  <span className="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>Create Account</span>
+                    <Sparkles size={16} />
+                  </>
+                )}
+              </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMode("signin")}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                >
+                  Already have an account? Sign in
+                </button>
+              </div>
+            </motion.form>
           )}
         </AnimatePresence>
 
         {/* Security Footer */}
         <div className="mt-6 pt-5 border-t border-gray-200/50 dark:border-gray-800/60 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
           <ShieldCheck size={14} className="text-green-500" />
-          <span>Local-first encrypted session · No password required</span>
+          <span>
+            Local-first encrypted session · Instant cross-device cloud sync
+          </span>
         </div>
       </motion.div>
     </div>
