@@ -1,4 +1,4 @@
-import React, { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
 export type Currency = "USD" | "EUR" | "MDL";
@@ -17,11 +17,19 @@ export type Bucket = {
 
 export type Transaction = {
   id: string;
-  bucketId: string;
+  bucketId: string | null; // null = one-off income
   amount: number;
+  type: "expense" | "income";
   date: string;
   note?: string;
 };
+
+const DEFAULT_BUCKETS: Bucket[] = [
+  { id: "default-housing", name: "Housing", allocated: 0 },
+  { id: "default-groceries", name: "Groceries", allocated: 0 },
+  { id: "default-utilities", name: "Utilities", allocated: 0 },
+  { id: "default-fun", name: "Fun", allocated: 0 },
+];
 
 type FinanceContextType = {
   currency: Currency;
@@ -31,41 +39,46 @@ type FinanceContextType = {
   buckets: Bucket[];
   addBucket: (b: Omit<Bucket, "id">) => void;
   removeBucket: (id: string) => void;
+  updateBucket: (id: string, data: Partial<Omit<Bucket, "id">>) => void;
   transactions: Transaction[];
   addTransaction: (t: Omit<Transaction, "id" | "date">) => void;
   geminiKey: string;
   setGeminiKey: (k: string) => void;
   getBucketSpent: (bucketId: string) => number;
   guaranteedSavings: number;
+  oneOffIncome: number;
 };
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
-  // New V4 storage keys to automatically wipe old incompatible data
   const [currency, setCurrency] = useLocalStorage<Currency>(
-    "orbit_v4_currency",
+    "orbit_v5_currency",
     "USD",
   );
   const [monthlyIncome, setMonthlyIncome] = useLocalStorage<number>(
-    "orbit_v4_income",
+    "orbit_v5_income",
     0,
   );
   const [buckets, setBuckets] = useLocalStorage<Bucket[]>(
-    "orbit_v4_buckets",
-    [],
+    "orbit_v5_buckets",
+    DEFAULT_BUCKETS,
   );
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
-    "orbit_v4_transactions",
+    "orbit_v5_transactions",
     [],
   );
   const [geminiKey, setGeminiKey] = useLocalStorage<string>(
-    "orbit_v4_geminikey",
+    "orbit_v5_geminikey",
     "",
   );
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
-  const guaranteedSavings = Math.max(0, monthlyIncome - totalAllocated);
+  const oneOffIncome = transactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const guaranteedSavings =
+    Math.max(0, monthlyIncome - totalAllocated) + oneOffIncome;
 
   const getBucketSpent = (bucketId: string) => {
     const currentMonth = new Date().getMonth();
@@ -73,6 +86,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .filter(
         (t) =>
           t.bucketId === bucketId &&
+          t.type === "expense" &&
           new Date(t.date).getMonth() === currentMonth,
       )
       .reduce((sum, t) => sum + t.amount, 0);
@@ -84,8 +98,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const removeBucket = (id: string) => {
     setBuckets(buckets.filter((b) => b.id !== id));
-    // Also remove associated transactions to keep data clean
     setTransactions(transactions.filter((t) => t.bucketId !== id));
+  };
+
+  const updateBucket = (id: string, data: Partial<Omit<Bucket, "id">>) => {
+    setBuckets(buckets.map((b) => (b.id === id ? { ...b, ...data } : b)));
   };
 
   const addTransaction = (t: Omit<Transaction, "id" | "date">) => {
@@ -105,12 +122,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         buckets,
         addBucket,
         removeBucket,
+        updateBucket,
         transactions,
         addTransaction,
         geminiKey,
         setGeminiKey,
         getBucketSpent,
         guaranteedSavings,
+        oneOffIncome,
       }}
     >
       {children}

@@ -1,49 +1,86 @@
-import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useFinance, currencySymbols } from "../context/FinanceContext";
-import { PiggyBank } from "lucide-react";
+import { PiggyBank, TrendingUp } from "lucide-react";
 
 export const Dashboard = () => {
-  const { monthlyIncome, guaranteedSavings, currency, buckets } = useFinance();
-
+  const { monthlyIncome, guaranteedSavings, oneOffIncome, currency, buckets } =
+    useFinance();
+  const sym = currencySymbols[currency];
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
   const progress =
-    monthlyIncome > 0 ? (totalAllocated / monthlyIncome) * 100 : 0;
-  const isOverAllocated = totalAllocated > monthlyIncome;
+    monthlyIncome > 0
+      ? Math.min((totalAllocated / monthlyIncome) * 100, 100)
+      : 0;
+  const isOverAllocated = totalAllocated > monthlyIncome && monthlyIncome > 0;
 
   return (
-    <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-2xl rounded-3xl p-10 w-full max-w-2xl mx-auto my-8 text-center relative overflow-hidden">
-      <div className="absolute top-0 right-0 p-6 opacity-10">
-        <PiggyBank size={160} />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 260, damping: 24 }}
+      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-2xl rounded-3xl p-10 w-full max-w-2xl mx-auto text-center relative overflow-hidden"
+    >
+      <div className="absolute -top-6 -right-6 opacity-[0.07] dark:opacity-[0.05]">
+        <PiggyBank size={200} />
       </div>
 
       <div className="relative z-10 flex flex-col items-center">
-        <h1 className="text-xl font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-widest text-sm">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3">
           Guaranteed Monthly Savings
-        </h1>
-        <h2
-          className={`text-6xl sm:text-7xl font-bold tracking-tight mb-8 ${isOverAllocated ? "text-red-600 dark:text-red-500" : "text-gray-900 dark:text-white"}`}
-        >
-          {currencySymbols[currency]}
-          {guaranteedSavings.toLocaleString()}
-        </h2>
+        </p>
 
-        <div className="w-full max-w-md bg-white/60 dark:bg-gray-900/60 rounded-full h-4 mb-2 overflow-hidden border border-white/50 dark:border-gray-700/50 relative">
-          <div
-            className={`h-full transition-all duration-1000 ${isOverAllocated ? "bg-red-500" : "bg-indigo-500"}`}
-            style={{ width: `${Math.min(progress, 100)}%` }}
+        <AnimatePresence mode="wait">
+          <motion.h2
+            key={guaranteedSavings}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 22 }}
+            className={`text-6xl sm:text-7xl font-bold tracking-tight mb-2 ${isOverAllocated ? "text-red-500 dark:text-red-400" : "text-gray-900 dark:text-white"}`}
+          >
+            {sym}
+            {guaranteedSavings.toLocaleString()}
+          </motion.h2>
+        </AnimatePresence>
+
+        {oneOffIncome > 0 && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-sm text-green-600 dark:text-green-400 font-medium mb-4 flex items-center gap-1"
+          >
+            <TrendingUp size={14} />
+            includes {sym}
+            {oneOffIncome.toLocaleString()} one-off income
+          </motion.p>
+        )}
+
+        {/* Allocation bar */}
+        <div className="w-full max-w-md bg-black/5 dark:bg-white/5 rounded-full h-3 mb-3 overflow-hidden mt-4">
+          <motion.div
+            className={`h-full rounded-full ${isOverAllocated ? "bg-red-500" : "bg-indigo-500"}`}
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 1, ease: "easeOut" }}
           />
         </div>
-        <div className="flex justify-between w-full max-w-md text-sm font-medium">
-          <span className="text-indigo-600 dark:text-indigo-400">
-            {currencySymbols[currency]}
+
+        <div className="flex justify-between w-full max-w-md text-sm font-medium text-gray-500 dark:text-gray-400">
+          <span
+            className={
+              isOverAllocated
+                ? "text-red-500"
+                : "text-indigo-500 dark:text-indigo-400"
+            }
+          >
+            {sym}
             {totalAllocated.toLocaleString()} allocated
           </span>
-          <span className="text-gray-500 dark:text-gray-400">
-            {currencySymbols[currency]}
+          <span>
+            {sym}
             {monthlyIncome.toLocaleString()} income
           </span>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
