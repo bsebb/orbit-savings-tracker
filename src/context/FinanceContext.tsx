@@ -9,7 +9,7 @@ export const currencySymbols: Record<Currency, string> = {
   MDL: "M",
 };
 
-const RATES_TO_USD: Record<Currency, number> = {
+export const RATES_TO_USD: Record<Currency, number> = {
   USD: 1,
   EUR: 1 / 0.92,
   MDL: 1 / 17.8,
@@ -26,7 +26,7 @@ export type Subscription = {
   name: string;
   amount: number;
   icon: string;
-  currency: Currency; // the currency this charge actually bills in
+  currency: Currency;
 };
 
 export type Transaction = {
@@ -34,16 +34,57 @@ export type Transaction = {
   bucketId: string | null;
   amount: number;
   type: "expense" | "income";
-  date: string;
+  date: string; // ISO string YYYY-MM-DD...
   note?: string;
 };
 
+export type Milestone = {
+  id: string;
+  title: string;
+  targetAmount: number;
+  targetDate?: string;
+  completed: boolean;
+};
+
+export type ChatMessage = {
+  role: "user" | "model";
+  text: string;
+  timestamp: string;
+};
+
 const DEFAULT_BUCKETS: Bucket[] = [
-  { id: "default-food", name: "Food", allocated: 0 },
-  { id: "default-transport", name: "Transport", allocated: 0 },
-  { id: "default-university", name: "University", allocated: 0 },
-  { id: "default-fun", name: "Fun", allocated: 0 },
+  { id: "default-food", name: "Food & Groceries", allocated: 400 },
+  { id: "default-transport", name: "Transport & Transit", allocated: 150 },
+  { id: "default-university", name: "University & Studies", allocated: 200 },
+  { id: "default-fun", name: "Leisure & Fun", allocated: 250 },
 ];
+
+const DEFAULT_MILESTONES: Milestone[] = [
+  {
+    id: "ms-1",
+    title: "Starter Emergency Buffer",
+    targetAmount: 2000,
+    completed: false,
+  },
+  {
+    id: "ms-2",
+    title: "6-Month Runway Cushion",
+    targetAmount: 12000,
+    completed: false,
+  },
+  {
+    id: "ms-3",
+    title: "Freedom & Investment Fund",
+    targetAmount: 50000,
+    completed: false,
+  },
+];
+
+export const formatMonthKey = (date: Date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+};
 
 type FinanceContextType = {
   currency: Currency;
@@ -59,65 +100,106 @@ type FinanceContextType = {
   removeSubscription: (id: string) => void;
   totalSubscriptions: number;
   transactions: Transaction[];
-  addTransaction: (t: Omit<Transaction, "id" | "date">) => void;
+  addTransaction: (
+    t: Omit<Transaction, "id" | "date"> & { date?: string },
+  ) => void;
+  removeTransaction: (id: string) => void;
   geminiKey: string;
   setGeminiKey: (k: string) => void;
-  getBucketSpent: (bucketId: string) => number;
+  selectedMonth: string;
+  setSelectedMonth: (m: string) => void;
+  getBucketSpent: (bucketId: string, monthKey?: string) => number;
   guaranteedSavings: number;
   oneOffIncome: number;
+  monthTransactions: Transaction[];
+  allMonths: string[];
+  milestones: Milestone[];
+  addMilestone: (m: Omit<Milestone, "id" | "completed">) => void;
+  toggleMilestone: (id: string) => void;
+  removeMilestone: (id: string) => void;
+  chatHistory: ChatMessage[];
+  addChatMessage: (msg: Omit<ChatMessage, "timestamp">) => void;
+  clearChatHistory: () => void;
+  exportBackupJSON: () => string;
+  importBackupJSON: (jsonStr: string) => boolean;
+  resetAllData: () => void;
 };
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
+  const currentMonthKey = formatMonthKey();
   const [currency, _setCurrency] = useLocalStorage<Currency>(
-    "orbit_v5_currency",
+    "orbit_v6_currency",
     "USD",
   );
   const [monthlyIncome, setMonthlyIncome] = useLocalStorage<number>(
-    "orbit_v5_income",
-    0,
+    "orbit_v6_income",
+    3500,
   );
   const [buckets, setBuckets] = useLocalStorage<Bucket[]>(
-    "orbit_v5_buckets",
+    "orbit_v6_buckets",
     DEFAULT_BUCKETS,
   );
   const [subscriptions, setSubscriptions] = useLocalStorage<Subscription[]>(
-    "orbit_v5_subs",
+    "orbit_v6_subs",
     [],
   );
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
-    "orbit_v5_transactions",
+    "orbit_v6_transactions",
     [],
   );
   const [geminiKey, setGeminiKey] = useLocalStorage<string>(
-    "orbit_v5_geminikey",
+    "orbit_v6_geminikey",
     "",
+  );
+  const [selectedMonth, setSelectedMonth] = useLocalStorage<string>(
+    "orbit_v6_selected_month",
+    currentMonthKey,
+  );
+  const [milestones, setMilestones] = useLocalStorage<Milestone[]>(
+    "orbit_v6_milestones",
+    DEFAULT_MILESTONES,
+  );
+  const [chatHistory, setChatHistory] = useLocalStorage<ChatMessage[]>(
+    "orbit_v6_chat_history",
+    [],
   );
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
-  // Each subscription stores its own native currency — convert to app currency on the fly
+
+  // Convert each subscription from its native currency to active app currency
   const totalSubscriptions = subscriptions.reduce((sum, s) => {
-    const subCurrency = s.currency ?? currency; // legacy subs without currency field fall back to app currency
+    const subCurrency = s.currency ?? currency;
     const converted =
       s.amount * (RATES_TO_USD[subCurrency] / RATES_TO_USD[currency]);
     return sum + converted;
   }, 0);
-  const oneOffIncome = transactions
+
+  // Month-scoped transactions
+  const monthTransactions = transactions.filter((t) => {
+    const tMonth = t.date.slice(0, 7);
+    return tMonth === selectedMonth;
+  });
+
+  const oneOffIncome = monthTransactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
+
   const guaranteedSavings =
     Math.max(0, monthlyIncome - totalAllocated - totalSubscriptions) +
     oneOffIncome;
 
-  const getBucketSpent = (bucketId: string) => {
-    const currentMonth = new Date().getMonth();
+  const getBucketSpent = (
+    bucketId: string,
+    monthKey: string = selectedMonth,
+  ) => {
     return transactions
       .filter(
         (t) =>
           t.bucketId === bucketId &&
           t.type === "expense" &&
-          new Date(t.date).getMonth() === currentMonth,
+          t.date.slice(0, 7) === monthKey,
       )
       .reduce((sum, t) => sum + t.amount, 0);
   };
@@ -136,12 +218,57 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const removeSubscription = (id: string) =>
     setSubscriptions(subscriptions.filter((s) => s.id !== id));
 
-  const addTransaction = (t: Omit<Transaction, "id" | "date">) =>
-    setTransactions([
-      { ...t, id: crypto.randomUUID(), date: new Date().toISOString() },
-      ...transactions,
-    ]);
+  const addTransaction = (
+    t: Omit<Transaction, "id" | "date"> & { date?: string },
+  ) => {
+    const date = t.date || new Date().toISOString();
+    setTransactions([{ ...t, id: crypto.randomUUID(), date }, ...transactions]);
+  };
 
+  const removeTransaction = (id: string) => {
+    setTransactions(transactions.filter((t) => t.id !== id));
+  };
+
+  const addMilestone = (m: Omit<Milestone, "id" | "completed">) => {
+    setMilestones([
+      ...milestones,
+      { ...m, id: crypto.randomUUID(), completed: false },
+    ]);
+  };
+
+  const toggleMilestone = (id: string) => {
+    setMilestones(
+      milestones.map((m) =>
+        m.id === id ? { ...m, completed: !m.completed } : m,
+      ),
+    );
+  };
+
+  const removeMilestone = (id: string) => {
+    setMilestones(milestones.filter((m) => m.id !== id));
+  };
+
+  const addChatMessage = (msg: Omit<ChatMessage, "timestamp">) => {
+    setChatHistory((prev) => [
+      ...prev,
+      { ...msg, timestamp: new Date().toISOString() },
+    ]);
+  };
+
+  const clearChatHistory = () => setChatHistory([]);
+
+  // Collect all unique historical and planned months
+  const allMonths = Array.from(
+    new Set([
+      currentMonthKey,
+      selectedMonth,
+      ...transactions.map((t) => t.date.slice(0, 7)),
+    ]),
+  )
+    .sort()
+    .reverse();
+
+  // Smart currency switch with proportional math
   const setCurrency = (newCurrency: Currency) => {
     if (newCurrency === currency) return;
     const factor = RATES_TO_USD[currency] / RATES_TO_USD[newCurrency];
@@ -150,8 +277,55 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setBuckets(
       buckets.map((b) => ({ ...b, allocated: r2(b.allocated * factor) })),
     );
-    // Subscriptions are NOT converted — each stores its own native currency
+    setMilestones(
+      milestones.map((m) => ({
+        ...m,
+        targetAmount: r2(m.targetAmount * factor),
+      })),
+    );
     _setCurrency(newCurrency);
+  };
+
+  const exportBackupJSON = () => {
+    const data = {
+      version: "6.0",
+      exportedAt: new Date().toISOString(),
+      currency,
+      monthlyIncome,
+      buckets,
+      subscriptions,
+      transactions,
+      milestones,
+    };
+    return JSON.stringify(data, null, 2);
+  };
+
+  const importBackupJSON = (jsonStr: string): boolean => {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.currency) _setCurrency(parsed.currency);
+      if (typeof parsed.monthlyIncome === "number")
+        setMonthlyIncome(parsed.monthlyIncome);
+      if (Array.isArray(parsed.buckets)) setBuckets(parsed.buckets);
+      if (Array.isArray(parsed.subscriptions))
+        setSubscriptions(parsed.subscriptions);
+      if (Array.isArray(parsed.transactions))
+        setTransactions(parsed.transactions);
+      if (Array.isArray(parsed.milestones)) setMilestones(parsed.milestones);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const resetAllData = () => {
+    _setCurrency("USD");
+    setMonthlyIncome(3500);
+    setBuckets(DEFAULT_BUCKETS);
+    setSubscriptions([]);
+    setTransactions([]);
+    setMilestones(DEFAULT_MILESTONES);
+    setChatHistory([]);
   };
 
   return (
@@ -171,11 +345,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         totalSubscriptions,
         transactions,
         addTransaction,
+        removeTransaction,
         geminiKey,
         setGeminiKey,
+        selectedMonth,
+        setSelectedMonth,
         getBucketSpent,
         guaranteedSavings,
         oneOffIncome,
+        monthTransactions,
+        allMonths,
+        milestones,
+        addMilestone,
+        toggleMilestone,
+        removeMilestone,
+        chatHistory,
+        addChatMessage,
+        clearChatHistory,
+        exportBackupJSON,
+        importBackupJSON,
+        resetAllData,
       }}
     >
       {children}

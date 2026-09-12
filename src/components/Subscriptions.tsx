@@ -7,6 +7,7 @@ import {
   type Currency,
 } from "../context/FinanceContext";
 import { RefreshCw, Trash2 } from "lucide-react";
+import { EmojiPicker } from "./ui/EmojiPicker";
 
 const ICONS = ["📺", "🎵", "☁️", "📦", "🎮", "📰", "🏋️", "🔐", "🌐", "⚡"];
 const CURRENCIES: Currency[] = ["USD", "EUR", "MDL"];
@@ -108,17 +109,7 @@ export const Subscriptions = () => {
         className="flex gap-2 mb-6 flex-wrap items-center"
       >
         {/* Emoji picker */}
-        <select
-          value={icon}
-          onChange={(e) => setIcon(e.target.value)}
-          className="bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
-        >
-          {ICONS.map((i) => (
-            <option key={i} value={i}>
-              {i}
-            </option>
-          ))}
-        </select>
+        <EmojiPicker value={icon} onChange={setIcon} />
 
         <input
           type="text"
