@@ -13,21 +13,34 @@ export const Ledger = () => {
   const [bucketId, setBucketId] = useState("");
   const [note, setNote] = useState("");
 
-  const bucketOptions = buckets.map((b) => ({ value: b.id, label: b.name }));
+  const bucketOptions = [
+    { value: "unbudgeted", label: "📦 Uncategorized / Miscellaneous" },
+    ...buckets.map((b) => ({ value: b.id, label: b.name })),
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
-    if (type === "expense" && !bucketId) return;
+
+    const targetBucketId =
+      type === "expense" && bucketId && bucketId !== "unbudgeted"
+        ? bucketId
+        : null;
+
     addTransaction({
       amount: Number(amount),
-      bucketId: type === "expense" ? bucketId : null,
+      bucketId: targetBucketId,
       type,
       note,
     });
+
+    const targetName = targetBucketId
+      ? buckets.find((b) => b.id === targetBucketId)?.name || "Miscellaneous"
+      : "Miscellaneous";
+
     const label =
       type === "expense"
-        ? `${sym}${amount} logged to ${buckets.find((b) => b.id === bucketId)?.name}`
+        ? `${sym}${amount} logged to ${targetName}`
         : `${sym}${amount} income added`;
     type === "expense"
       ? toast.success(label)

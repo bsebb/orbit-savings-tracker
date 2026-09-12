@@ -61,7 +61,9 @@ export const Timeline = () => {
   // Filtered by search and bucket
   const filtered = monthTransactions.filter((t) => {
     const bucket = buckets.find((b) => b.id === t.bucketId);
-    const nameMatch = (bucket?.name || "Income")
+    const categoryName =
+      t.type === "income" ? "Income" : bucket?.name || "Uncategorized";
+    const nameMatch = categoryName
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const noteMatch = (t.note || "")
@@ -71,6 +73,8 @@ export const Timeline = () => {
 
     if (filterBucket === "all") return matchesSearch;
     if (filterBucket === "income") return matchesSearch && t.type === "income";
+    if (filterBucket === "unbudgeted")
+      return matchesSearch && t.type === "expense" && !t.bucketId;
     return matchesSearch && t.bucketId === filterBucket;
   });
 
@@ -97,7 +101,7 @@ export const Timeline = () => {
         const cat =
           t.type === "income"
             ? "Income"
-            : buckets.find((b) => b.id === t.bucketId)?.name || "General";
+            : buckets.find((b) => b.id === t.bucketId)?.name || "Uncategorized";
         const note = `"${(t.note || "").replace(/"/g, '""')}"`;
         return `${t.date.slice(0, 10)},${t.type},${cat},${t.amount},${note}`;
       })
@@ -229,6 +233,7 @@ export const Timeline = () => {
           options={[
             { value: "all", label: "All Categories" },
             { value: "income", label: "Only Income" },
+            { value: "unbudgeted", label: "📦 Uncategorized / Misc" },
             ...buckets.map((b) => ({
               value: b.id,
               label: b.name,
@@ -278,7 +283,7 @@ export const Timeline = () => {
                       <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         {isIncome
                           ? "One-off Income"
-                          : b?.name || "General Expense"}
+                          : b?.name || "📦 Uncategorized Expense"}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
                         {t.date.slice(0, 10)}

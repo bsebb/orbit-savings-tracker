@@ -29,6 +29,7 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
     monthlyIncome,
     guaranteedSavings,
     oneOffIncome,
+    unbudgetedExpenses,
     totalSubscriptions,
     currency,
     buckets,
@@ -85,22 +86,27 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
   const handleQuickSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickAmount) return;
-    if (quickType === "expense" && !quickBucket) {
-      toast.error("Select an expense bucket");
-      return;
-    }
+
+    const targetBucketId =
+      quickType === "expense" && quickBucket && quickBucket !== "unbudgeted"
+        ? quickBucket
+        : null;
 
     addTransaction({
       amount: Number(quickAmount),
-      bucketId: quickType === "expense" ? quickBucket : null,
+      bucketId: targetBucketId,
       type: quickType,
       note: quickNote,
       date: new Date().toISOString(),
     });
 
+    const targetName = targetBucketId
+      ? buckets.find((b) => b.id === targetBucketId)?.name || "Miscellaneous"
+      : "Miscellaneous";
+
     toast.success(
       quickType === "expense"
-        ? `${sym}${quickAmount} logged to ${buckets.find((b) => b.id === quickBucket)?.name}`
+        ? `${sym}${quickAmount} logged to ${targetName}`
         : `${sym}${quickAmount} one-off income recorded`,
       {
         icon: quickType === "expense" ? "💸" : "💰",
@@ -115,7 +121,10 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
     setQuickNote("");
   };
 
-  const bucketOptions = buckets.map((b) => ({ value: b.id, label: b.name }));
+  const bucketOptions = [
+    { value: "unbudgeted", label: "📦 Uncategorized / Miscellaneous" },
+    ...buckets.map((b) => ({ value: b.id, label: b.name })),
+  ];
 
   // Sequential active milestones
   const uncompletedMilestones = milestones.filter((m) => !m.completed);
@@ -210,10 +219,24 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-sm text-green-600 dark:text-green-400 font-medium mb-3 flex items-center gap-1"
+              className="text-sm text-green-600 dark:text-green-400 font-medium mb-1 flex items-center gap-1"
             >
               <TrendingUp size={14} /> includes {sym}
               {Math.round(oneOffIncome).toLocaleString()} one-off income
+            </motion.p>
+          )}
+
+          {unbudgetedExpenses > 0 && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-3 flex items-center gap-1 bg-amber-500/10 dark:bg-amber-500/15 px-2.5 py-1 rounded-full border border-amber-500/20"
+            >
+              <span>
+                ⚠️ includes {sym}
+                {Math.round(unbudgetedExpenses).toLocaleString()} unbudgeted
+                expenses
+              </span>
             </motion.p>
           )}
 

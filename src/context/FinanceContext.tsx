@@ -139,6 +139,7 @@ type FinanceContextType = {
   getBucketSpent: (bucketId: string, monthKey?: string) => number;
   guaranteedSavings: number;
   oneOffIncome: number;
+  unbudgetedExpenses: number;
   monthTransactions: Transaction[];
   allMonths: string[];
   milestones: Milestone[];
@@ -645,9 +646,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const unbudgetedExpenses = monthTransactions
+    .filter((t) => t.type === "expense" && !t.bucketId)
+    .reduce((sum, t) => sum + t.amount, 0);
+
   const guaranteedSavings =
-    Math.max(0, monthlyIncome - totalAllocated - totalSubscriptions) +
-    oneOffIncome;
+    Math.max(
+      0,
+      monthlyIncome - totalAllocated - totalSubscriptions - unbudgetedExpenses,
+    ) + oneOffIncome;
 
   const getBucketSpent = (
     bucketId: string,
@@ -672,7 +679,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const target = buckets.find((b) => b.id === id);
     recordSnapshot(`Remove envelope: ${target?.name || "item"}`);
     setBuckets(buckets.filter((b) => b.id !== id));
-    setTransactions(transactions.filter((t) => t.bucketId !== id));
+    // Preserve transaction history by reassigning to unbudgeted / uncategorized
+    setTransactions(
+      transactions.map((t) =>
+        t.bucketId === id ? { ...t, bucketId: null } : t,
+      ),
+    );
   };
 
   const updateBucket = (id: string, data: Partial<Omit<Bucket, "id">>) => {
@@ -871,6 +883,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         getBucketSpent,
         guaranteedSavings,
         oneOffIncome,
+        unbudgetedExpenses,
         monthTransactions,
         allMonths,
         milestones,

@@ -84,6 +84,7 @@ export const Buckets = () => {
     getBucketSpent,
     currency,
     monthlyIncome,
+    unbudgetedExpenses,
     addTransaction,
     undo,
   } = useFinance();
@@ -448,6 +449,38 @@ export const Buckets = () => {
                 </motion.div>
               );
             })
+          )}
+
+          {unbudgetedExpenses > 0 && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              className="relative p-4 sm:p-5 bg-amber-50/60 dark:bg-amber-950/20 rounded-2xl border border-amber-200/60 dark:border-amber-800/40 shadow-sm overflow-hidden group space-y-3"
+            >
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                    <span>📦</span> Uncategorized / Miscellaneous
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 font-medium">
+                    {sym}
+                    {unbudgetedExpenses.toLocaleString()} spent this month
+                  </p>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 shrink-0">
+                  Unbudgeted
+                </span>
+              </div>
+              <div className="flex justify-between items-end pt-1 text-xs">
+                <span className="text-gray-400">No envelope limit</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                  Deducted from savings buffer
+                </span>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
