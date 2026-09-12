@@ -12,10 +12,21 @@ import { Moon, Sun } from "lucide-react";
 
 const ThemeToggle = () => {
   const { theme, setTheme } = useTheme();
+
+  const handleToggle = () => {
+    // Add class so the CSS transition activates, then remove it after the switch completes
+    document.documentElement.classList.add("theme-transitioning");
+    setTheme(theme === "dark" ? "light" : "dark");
+    setTimeout(
+      () => document.documentElement.classList.remove("theme-transitioning"),
+      300,
+    );
+  };
+
   return (
     <button
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="absolute top-5 right-5 p-2.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 shadow-sm text-gray-600 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all z-50"
+      onClick={handleToggle}
+      className="absolute top-5 right-5 p-2.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 shadow-sm text-gray-600 dark:text-gray-300 hover:scale-105 active:scale-95 z-50"
       aria-label="Toggle theme"
     >
       {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
