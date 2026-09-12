@@ -15,12 +15,20 @@ import { AuthScreen } from "./components/AuthScreen";
 import { Moon, Sun } from "lucide-react";
 
 const ThemeToggle = () => {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted ? resolvedTheme === "dark" : false;
 
   const handleToggle = () => {
+    const nextTheme = isDark ? "light" : "dark";
     const root = document.documentElement;
     root.style.setProperty("--theme-duration", "280ms");
-    setTheme(theme === "dark" ? "light" : "dark");
+    setTheme(nextTheme);
     setTimeout(() => root.style.setProperty("--theme-duration", "0ms"), 300);
   };
 
@@ -29,38 +37,28 @@ const ThemeToggle = () => {
       onClick={handleToggle}
       className="p-2.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 shadow-sm text-gray-600 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all"
       aria-label="Toggle theme"
+      title={`Switch to ${isDark ? "light" : "dark"} mode`}
     >
-      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 };
 
 function AppInner() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const { userEmail } = useFinance();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
-
-  useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      if (tg.colorScheme) {
-        setTheme(tg.colorScheme);
-      }
-    }
-  }, [setTheme]);
 
   return (
     <div className="min-h-screen relative p-4 sm:p-8">
       {/* Light gradient — fades out in dark mode */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 dark:opacity-0 -z-10" />
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 dark:opacity-0 -z-10 pointer-events-none transition-opacity duration-300" />
       {/* Dark gradient — fades in in dark mode */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 opacity-0 dark:opacity-100 -z-10" />
+      <div className="fixed inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 opacity-0 dark:opacity-100 -z-10 pointer-events-none transition-opacity duration-300" />
 
       <Toaster
         position="top-center"
-        theme={theme === "dark" ? "dark" : "light"}
+        theme={resolvedTheme === "dark" ? "dark" : "light"}
         toastOptions={{
           style: {
             borderRadius: "16px",
