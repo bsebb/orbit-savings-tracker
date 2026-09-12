@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -24,7 +24,13 @@ import {
   ArrowUp,
   ArrowDown,
   Zap,
+  RefreshCw,
 } from "lucide-react";
+import {
+  generateSmartMilestones,
+  getContextualDefaultMilestones,
+  type SuggestedMilestone,
+} from "../utils/gemini";
 
 ChartJS.register(
   CategoryScale,
@@ -38,6 +44,9 @@ ChartJS.register(
 export const Runway = () => {
   const {
     guaranteedSavings,
+    monthlyIncome,
+    buckets,
+    geminiKey,
     currency,
     milestones,
     addMilestone,
@@ -55,6 +64,66 @@ export const Runway = () => {
   const [annualApy, setAnnualApy] = useState(5); // 5% default return
   const [newTitle, setNewTitle] = useState("");
   const [newTarget, setNewTarget] = useState("");
+
+  const [smartMilestones, setSmartMilestones] = useState<SuggestedMilestone[]>(
+    () => {
+      try {
+        const cached = localStorage.getItem("orbit_v6_smart_milestones");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+      return getContextualDefaultMilestones(
+        sym.trim(),
+        guaranteedSavings,
+        monthlyIncome,
+      );
+    },
+  );
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Recalculate smart contextual defaults when savings pace or currency changes
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("orbit_v6_smart_milestones");
+      if (!cached) {
+        setSmartMilestones(
+          getContextualDefaultMilestones(
+            sym.trim(),
+            guaranteedSavings,
+            monthlyIncome,
+          ),
+        );
+      }
+    } catch {}
+  }, [guaranteedSavings, monthlyIncome, currency]);
+
+  const handleGenerateAIMilestones = async () => {
+    if (isGeneratingAI) return;
+    setIsGeneratingAI(true);
+    try {
+      const results = await generateSmartMilestones(geminiKey, {
+        currency: sym.trim(),
+        monthlyIncome,
+        guaranteedSavings,
+        buckets: buckets.map((b) => b.name),
+      });
+      setSmartMilestones(results);
+      try {
+        localStorage.setItem(
+          "orbit_v6_smart_milestones",
+          JSON.stringify(results),
+        );
+      } catch {}
+      toast.success(
+        geminiKey
+          ? "✨ AI generated 4 custom seasonal milestones for your pace!"
+          : "✨ Smart milestones calibrated to your pace (add API key in Settings for live AI)",
+      );
+    } catch {
+      toast.error("Failed to generate milestones");
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
 
   // 4-year compounding projection
   const monthlyRate = annualApy / 100 / 12;
@@ -265,58 +334,83 @@ export const Runway = () => {
           )}
         </div>
 
-        {/* Popular Goal Quick Presets */}
-        <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
-            Quick Add Milestones
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {[
-              {
-                title: "📱 iPhone 16 Pro",
-                amount:
-                  currency === "MDL" ? 17000 : currency === "EUR" ? 950 : 999,
-              },
-              {
-                title: "💻 MacBook Pro M-series",
-                amount:
-                  currency === "MDL" ? 32000 : currency === "EUR" ? 1800 : 1900,
-              },
-              {
-                title: "✈️ Summer Vacation",
-                amount:
-                  currency === "MDL" ? 12000 : currency === "EUR" ? 650 : 700,
-              },
-              {
-                title: "🛡️ 3-Month Emergency Fund",
-                amount:
-                  currency === "MDL" ? 30000 : currency === "EUR" ? 1600 : 1700,
-              },
-            ].map((p) => (
-              <button
-                key={p.title}
-                type="button"
-                onClick={() => {
-                  addMilestone({ title: p.title, targetAmount: p.amount });
-                  toast.success(
-                    `Added ${p.title} (${sym}${p.amount.toLocaleString()})`,
-                    {
-                      action: {
-                        label: "Undo",
-                        onClick: () => undo(),
+        {/* Dynamic AI-Powered Milestone Suggestions */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={14} className="text-purple-500" />
+              <label className="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">
+                {geminiKey ? "AI Dynamic Milestones" : "Smart Paced Milestones"}
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGenerateAIMilestones}
+              disabled={isGeneratingAI}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/50 rounded-xl disabled:opacity-50 transition-all active:scale-95"
+              title="Poll Gemini to generate fresh, seasonal, personalized savings goals"
+            >
+              <RefreshCw
+                size={12}
+                className={isGeneratingAI ? "animate-spin" : ""}
+              />
+              <span>
+                {isGeneratingAI ? "Generating..." : "Refresh with AI"}
+              </span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {smartMilestones.map((p) => {
+              const months =
+                guaranteedSavings > 0
+                  ? Math.ceil(p.amount / guaranteedSavings)
+                  : 0;
+
+              return (
+                <button
+                  key={p.title}
+                  type="button"
+                  onClick={() => {
+                    addMilestone({ title: p.title, targetAmount: p.amount });
+                    toast.success(
+                      `Added ${p.title} (${sym}${p.amount.toLocaleString()})`,
+                      {
+                        action: {
+                          label: "Undo",
+                          onClick: () => undo(),
+                        },
                       },
-                    },
-                  );
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/70 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all active:scale-95"
-              >
-                <span>{p.title}</span>
-                <span className="text-[10px] text-gray-400 font-bold">
-                  {sym}
-                  {p.amount.toLocaleString()}
-                </span>
-              </button>
-            ))}
+                    );
+                  }}
+                  className="flex items-center justify-between p-3 bg-white/70 dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-700/70 hover:border-purple-400 dark:hover:border-purple-500 rounded-2xl text-left transition-all active:scale-[0.99] group shadow-sm"
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                      {p.title}
+                    </p>
+                    {p.tagline && (
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                        {p.tagline}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-extrabold text-purple-600 dark:text-purple-400 block">
+                      {sym}
+                      {p.amount.toLocaleString()}
+                    </span>
+                    {months > 0 && (
+                      <span className="text-[9px] text-gray-400 block">
+                        ~{months} {months === 1 ? "mo" : "mos"}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

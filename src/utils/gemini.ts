@@ -97,3 +97,131 @@ export async function askAccountant(
 
   return { reply, updatedHistory };
 }
+
+export type SuggestedMilestone = {
+  title: string;
+  amount: number;
+  tagline?: string;
+};
+
+export function getContextualDefaultMilestones(
+  _currency?: string,
+  guaranteedSavings: number = 0,
+  monthlyIncome: number = 0,
+): SuggestedMilestone[] {
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().toLocaleString("default", { month: "long" });
+  const pace =
+    guaranteedSavings > 0 ? guaranteedSavings : monthlyIncome * 0.25 || 1000;
+  const roundVal = (n: number) => Math.max(100, Math.round(n / 50) * 50);
+
+  return [
+    {
+      title: "🛡️ 1-Month Emergency Buffer",
+      amount: roundVal(pace),
+      tagline: "1 mo safety reserve",
+    },
+    {
+      title: `✈️ ${currentMonth} ${currentYear} Seasonal Getaway`,
+      amount: roundVal(pace * 1.5),
+      tagline: "Seasonal vacation fund",
+    },
+    {
+      title: "📱 Flagship Hardware & Tech Upgrade",
+      amount: roundVal(pace * 2.2),
+      tagline: "Next-gen gear upgrade",
+    },
+    {
+      title: "🚀 Long-Term Financial Freedom Fund",
+      amount: roundVal(pace * 5),
+      tagline: "Compounding cushion",
+    },
+  ];
+}
+
+export async function generateSmartMilestones(
+  apiKey: string,
+  ctx: {
+    currency: string;
+    monthlyIncome: number;
+    guaranteedSavings: number;
+    buckets?: string[];
+  },
+): Promise<SuggestedMilestone[]> {
+  if (!apiKey) {
+    return getContextualDefaultMilestones(
+      ctx.currency,
+      ctx.guaranteedSavings,
+      ctx.monthlyIncome,
+    );
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const currentDate = new Date().toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  const prompt = `You are a personalized wealth advisor in the Orbit savings tracker app.
+Current date: ${currentDate}.
+The user's real-time financial stats:
+- Currency: ${ctx.currency}
+- Monthly Income: ${ctx.currency}${ctx.monthlyIncome}
+- Guaranteed Monthly Savings Rate: ${ctx.currency}${ctx.guaranteedSavings}/month
+- Active Budget Envelopes: ${ctx.buckets?.join(", ") || "None"}
+
+Generate exactly 4 realistic, motivating, timely savings milestones tailored specifically for this user's exact pace and current timeframe (${currentDate}).
+For example: season-specific goals (travel, holidays), upcoming device upgrades, emergency buffer, or investment seed.
+Target amounts must be scaled proportionally between 0.5x and 6x their monthly savings pace (${ctx.currency}${ctx.guaranteedSavings}/mo).
+
+Output ONLY a valid JSON array of 4 items with NO markdown formatting, NO backticks, and NO conversational filler:
+[
+  {
+    "title": "Emoji + Goal Name (e.g. 📱 Next-Gen Flagship Phone)",
+    "amount": integer amount in ${ctx.currency},
+    "tagline": "Brief 3-5 word rationale (e.g. 2 months savings pace)"
+  }
+]`;
+
+  const models = [
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash",
+    "gemini-3.6-flash",
+  ];
+
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+
+      const text = response.text?.trim() || "";
+      const cleaned = text
+        .replace(/```(?:json)?/gi, "")
+        .replace(/```/g, "")
+        .trim();
+      const jsonStart = cleaned.indexOf("[");
+      const jsonEnd = cleaned.lastIndexOf("]");
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.slice(0, 4).map((item: any) => ({
+            title: String(item.title || "Custom Goal"),
+            amount: Number(item.amount) || 1000,
+            tagline: item.tagline ? String(item.tagline) : undefined,
+          }));
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return getContextualDefaultMilestones(
+    ctx.currency,
+    ctx.guaranteedSavings,
+    ctx.monthlyIncome,
+  );
+}
