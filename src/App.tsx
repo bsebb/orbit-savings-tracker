@@ -36,11 +36,11 @@ const ThemeToggle = () => {
   return (
     <button
       onClick={handleToggle}
-      className="p-2.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 shadow-sm text-gray-600 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all"
+      className="p-2 sm:p-2.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 shadow-sm text-gray-600 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all shrink-0"
       aria-label="Toggle theme"
       title={`Switch to ${isDark ? "light" : "dark"} mode`}
     >
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      {isDark ? <Sun size={17} /> : <Moon size={17} />}
     </button>
   );
 };
@@ -80,23 +80,23 @@ function AppInner() {
         ) : (
           <>
             {/* Top Header */}
-            <header className="flex items-center justify-between pt-6 pb-4 px-2">
-              <div>
-                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            <header className="flex items-center justify-between pt-5 sm:pt-6 pb-3 sm:pb-4 px-1 sm:px-2 gap-2">
+              <div className="shrink-0 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
                   Orbit
                 </h1>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase">
+                <p className="text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase whitespace-nowrap">
                   Financial Operating System
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <SyncStatusBadge />
                 <button
                   onClick={() => setActiveTab("settings")}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                  className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all shadow-sm shrink-0"
                   title="Account Settings"
                 >
-                  <span className="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[10px] font-bold">
+                  <span className="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                     {userEmail.slice(0, 1).toUpperCase()}
                   </span>
                   <span className="hidden sm:inline truncate max-w-[140px]">
