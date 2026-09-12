@@ -31,15 +31,19 @@
 }
 
 /* ─── Dark/Light Transition ─────────────────────────────────────── */
-/* Only animate colors during the actual theme switch.               */
-/* Global * transitions cause staggered repaints across DOM layers.  */
-.theme-transitioning *,
-.theme-transitioning *::before,
-.theme-transitioning *::after {
+/* CSS custom property resolves in a single global style recalc —    */
+/* every element reads --theme-duration simultaneously, no stagger.  */
+:root {
+  --theme-duration: 0ms;
+}
+
+*,
+*::before,
+*::after {
   transition-property:
-    background-color, border-color, color, fill, stroke, opacity !important;
-  transition-duration: 280ms !important;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+    background-color, border-color, color, fill, stroke, opacity;
+  transition-duration: var(--theme-duration);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ─── Input Polish ───────────────────────────────────────────────── */

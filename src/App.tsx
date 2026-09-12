@@ -14,13 +14,10 @@ const ThemeToggle = () => {
   const { theme, setTheme } = useTheme();
 
   const handleToggle = () => {
-    // Add class so the CSS transition activates, then remove it after the switch completes
-    document.documentElement.classList.add("theme-transitioning");
+    const root = document.documentElement;
+    root.style.setProperty("--theme-duration", "280ms");
     setTheme(theme === "dark" ? "light" : "dark");
-    setTimeout(
-      () => document.documentElement.classList.remove("theme-transitioning"),
-      300,
-    );
+    setTimeout(() => root.style.setProperty("--theme-duration", "0ms"), 300);
   };
 
   return (
