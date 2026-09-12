@@ -235,6 +235,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const [undoStack, setUndoStack] = useState<StateSnapshot[]>([]);
   const isHydratedRef = useRef(false);
+  const isApplyingCloudDataRef = useRef(false);
+  const lastLocalEditAtRef = useRef<number>(0);
 
   const [cloudSyncStatus, setCloudSyncStatus] = useState<
     "synced" | "syncing" | "offline"
@@ -247,7 +249,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     null,
   );
 
+  const lastSyncedAtRef = useRef<string | null>(lastSyncedAt);
+  useEffect(() => {
+    lastSyncedAtRef.current = lastSyncedAt;
+  }, [lastSyncedAt]);
+
+  const transactionsRef = useRef<Transaction[]>(transactions);
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
+
   const recordSnapshot = (description: string) => {
+    lastLocalEditAtRef.current = Date.now();
     setUndoStack((prev) => [
       ...prev.slice(-19),
       {
@@ -305,7 +318,59 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undoStack]);
 
-  // 1. On login: hydrate state from Upstash Redis and merge safely
+  const applyCloudData = (cloudData: any) => {
+    if (!cloudData) return;
+    isApplyingCloudDataRef.current = true;
+    setSaveStatus("syncing");
+
+    if (cloudData.currency) _setCurrency(cloudData.currency);
+    if (typeof cloudData.monthlyIncome === "number")
+      setMonthlyIncome(cloudData.monthlyIncome);
+    if (Array.isArray(cloudData.buckets) && cloudData.buckets.length > 0)
+      setBuckets(cloudData.buckets);
+    if (Array.isArray(cloudData.subscriptions))
+      setSubscriptions(cloudData.subscriptions);
+
+    const localTime = lastSyncedAtRef.current
+      ? new Date(lastSyncedAtRef.current).getTime()
+      : 0;
+
+    if (Array.isArray(cloudData.transactions)) {
+      // Retain only fresh local transactions created locally while offline (timestamp > last known sync time)
+      const freshOfflineTx = transactionsRef.current.filter((t) => {
+        const tTime = new Date(t.date).getTime();
+        return (
+          tTime > localTime &&
+          !cloudData.transactions.some((ct: Transaction) => ct.id === t.id)
+        );
+      });
+
+      const merged = [...freshOfflineTx, ...cloudData.transactions].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+      setTransactions(merged);
+    }
+
+    if (Array.isArray(cloudData.milestones))
+      setMilestones(cloudData.milestones);
+
+    if (cloudData.lastSyncedAt) {
+      setLastSyncedAt(cloudData.lastSyncedAt);
+      lastSyncedAtRef.current = cloudData.lastSyncedAt;
+    }
+
+    setCloudSyncStatus("synced");
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus("idle"), 2000);
+
+    // Keep applying flag true to prevent inbound cloud data from triggering a bounce-back auto-sync
+    setTimeout(() => {
+      isApplyingCloudDataRef.current = false;
+      isHydratedRef.current = true;
+    }, 1800);
+  };
+
+  // 1. On login: hydrate state from Upstash Redis
   useEffect(() => {
     if (!userEmail) {
       isHydratedRef.current = true;
@@ -316,41 +381,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .then((cloudData) => {
         if (!isMounted) return;
         if (cloudData) {
-          if (cloudData.currency) _setCurrency(cloudData.currency);
-          if (typeof cloudData.monthlyIncome === "number")
-            setMonthlyIncome(cloudData.monthlyIncome);
-          if (Array.isArray(cloudData.buckets) && cloudData.buckets.length > 0)
-            setBuckets(cloudData.buckets);
-          if (Array.isArray(cloudData.subscriptions))
-            setSubscriptions(cloudData.subscriptions);
-
-          // Deep merge transactions by ID so fresh offline/local transactions are never overwritten
-          if (Array.isArray(cloudData.transactions)) {
-            setTransactions((localTx) => {
-              const txMap = new Map<string, Transaction>();
-              cloudData.transactions.forEach((t: Transaction) =>
-                txMap.set(t.id, t),
-              );
-              localTx.forEach((t: Transaction) => txMap.set(t.id, t));
-              return Array.from(txMap.values()).sort(
-                (a, b) =>
-                  new Date(b.date).getTime() - new Date(a.date).getTime(),
-              );
-            });
-          }
-
-          if (Array.isArray(cloudData.milestones))
-            setMilestones(cloudData.milestones);
-          if (cloudData.lastSyncedAt) setLastSyncedAt(cloudData.lastSyncedAt);
+          applyCloudData(cloudData);
+        } else {
+          isHydratedRef.current = true;
         }
       })
       .catch((err) => {
         console.warn("Cloud hydration note:", err);
-      })
-      .finally(() => {
-        if (isMounted) {
-          isHydratedRef.current = true;
-        }
+        if (isMounted) isHydratedRef.current = true;
       });
 
     return () => {
@@ -358,15 +396,71 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     };
   }, [userEmail]);
 
-  // 2. Debounced auto-sync (1-second persistence) to Upstash Redis
+  // 2. Cross-device sync: Listen for tab visibility, window focus, and background polling
+  useEffect(() => {
+    if (!userEmail) return;
+
+    const checkForCloudUpdates = async () => {
+      // If user is currently typing/editing locally (within 3 seconds) or applying cloud updates, skip
+      if (Date.now() - lastLocalEditAtRef.current < 3000) return;
+      if (isApplyingCloudDataRef.current) return;
+
+      try {
+        const cloudData = await fetchCloudUserData(userEmail);
+        if (!cloudData || !cloudData.lastSyncedAt) return;
+
+        const cloudTime = new Date(cloudData.lastSyncedAt).getTime();
+        const localTime = lastSyncedAtRef.current
+          ? new Date(lastSyncedAtRef.current).getTime()
+          : 0;
+
+        // Strictly apply if cloud is newer than local timestamp
+        if (cloudTime > localTime) {
+          applyCloudData(cloudData);
+        }
+      } catch (e) {
+        console.warn("Cross-device sync check error:", e);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkForCloudUpdates();
+      }
+    };
+
+    const onFocus = () => {
+      checkForCloudUpdates();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+
+    // Foreground poll every 20 seconds while app is active
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        checkForCloudUpdates();
+      }
+    }, 20000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+      clearInterval(pollInterval);
+    };
+  }, [userEmail]);
+
+  // 3. Debounced auto-sync (1-second persistence) to Upstash Redis
   useEffect(() => {
     if (!userEmail) return;
     if (!isHydratedRef.current) return;
+    if (isApplyingCloudDataRef.current) return;
 
     setSaveStatus("syncing");
     setCloudSyncStatus("syncing");
 
     const timer = setTimeout(async () => {
+      if (isApplyingCloudDataRef.current) return;
       const now = new Date().toISOString();
       const ok = await syncCloudUserData(userEmail, {
         currency,
@@ -381,6 +475,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setSaveStatus("saved");
         setCloudSyncStatus("synced");
         setLastSyncedAt(now);
+        lastSyncedAtRef.current = now;
         const resetTimer = setTimeout(() => setSaveStatus("idle"), 2500);
         return () => clearTimeout(resetTimer);
       } else {
@@ -420,6 +515,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setSaveStatus("saved");
       setCloudSyncStatus("synced");
       setLastSyncedAt(now);
+      lastSyncedAtRef.current = now;
       setTimeout(() => setSaveStatus("idle"), 2500);
     } else {
       setSaveStatus("offline");
@@ -580,6 +676,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     _setCurrency(newCurrency);
   };
 
+  const handleSetMonthlyIncome = (val: number) => {
+    recordSnapshot("Update monthly income");
+    setMonthlyIncome(val);
+  };
+
   const exportBackupJSON = () => {
     const data = {
       version: "6.0",
@@ -628,7 +729,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         currency,
         setCurrency,
         monthlyIncome,
-        setMonthlyIncome,
+        setMonthlyIncome: handleSetMonthlyIncome,
         buckets,
         addBucket,
         removeBucket,
