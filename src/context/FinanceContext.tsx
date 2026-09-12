@@ -1,66 +1,91 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
-export type Category = {
+export type Currency = "USD" | "EUR" | "MDL";
+
+export const currencySymbols: Record<Currency, string> = {
+  USD: "$",
+  EUR: "€",
+  MDL: "MDL",
+};
+
+export type Bucket = {
   id: string;
   name: string;
-  targetAmount: number;
-  type: "income" | "expense";
+  allocated: number;
 };
 
 export type Transaction = {
   id: string;
-  categoryId: string;
+  bucketId: string;
   amount: number;
   date: string;
   note?: string;
 };
 
-export type Goal = {
-  id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-};
-
 type FinanceContextType = {
-  categories: Category[];
-  addCategory: (c: Omit<Category, "id">) => void;
+  currency: Currency;
+  setCurrency: (c: Currency) => void;
+  monthlyIncome: number;
+  setMonthlyIncome: (v: number) => void;
+  buckets: Bucket[];
+  addBucket: (b: Omit<Bucket, "id">) => void;
+  removeBucket: (id: string) => void;
   transactions: Transaction[];
   addTransaction: (t: Omit<Transaction, "id" | "date">) => void;
-  goals: Goal[];
-  addGoal: (g: Omit<Goal, "id" | "currentAmount">) => void;
-  updateGoalProgress: (id: string, amount: number) => void;
-  balance: number;
   geminiKey: string;
   setGeminiKey: (k: string) => void;
+  getBucketSpent: (bucketId: string) => number;
+  guaranteedSavings: number;
 };
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
-  const [categories, setCategories] = useLocalStorage<Category[]>(
-    "orbit_categories",
+  // New V4 storage keys to automatically wipe old incompatible data
+  const [currency, setCurrency] = useLocalStorage<Currency>(
+    "orbit_v4_currency",
+    "USD",
+  );
+  const [monthlyIncome, setMonthlyIncome] = useLocalStorage<number>(
+    "orbit_v4_income",
+    0,
+  );
+  const [buckets, setBuckets] = useLocalStorage<Bucket[]>(
+    "orbit_v4_buckets",
     [],
   );
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
-    "orbit_transactions",
+    "orbit_v4_transactions",
     [],
   );
-  const [goals, setGoals] = useLocalStorage<Goal[]>("orbit_goals", []);
   const [geminiKey, setGeminiKey] = useLocalStorage<string>(
-    "orbit_geminikey",
+    "orbit_v4_geminikey",
     "",
   );
 
-  const balance = transactions.reduce((acc, tx) => {
-    const cat = categories.find((c) => c.id === tx.categoryId);
-    if (!cat) return acc;
-    return cat.type === "income" ? acc + tx.amount : acc - tx.amount;
-  }, 0);
+  const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
+  const guaranteedSavings = Math.max(0, monthlyIncome - totalAllocated);
 
-  const addCategory = (c: Omit<Category, "id">) => {
-    setCategories([...categories, { ...c, id: crypto.randomUUID() }]);
+  const getBucketSpent = (bucketId: string) => {
+    const currentMonth = new Date().getMonth();
+    return transactions
+      .filter(
+        (t) =>
+          t.bucketId === bucketId &&
+          new Date(t.date).getMonth() === currentMonth,
+      )
+      .reduce((sum, t) => sum + t.amount, 0);
+  };
+
+  const addBucket = (b: Omit<Bucket, "id">) => {
+    setBuckets([...buckets, { ...b, id: crypto.randomUUID() }]);
+  };
+
+  const removeBucket = (id: string) => {
+    setBuckets(buckets.filter((b) => b.id !== id));
+    // Also remove associated transactions to keep data clean
+    setTransactions(transactions.filter((t) => t.bucketId !== id));
   };
 
   const addTransaction = (t: Omit<Transaction, "id" | "date">) => {
@@ -70,31 +95,22 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     ]);
   };
 
-  const addGoal = (g: Omit<Goal, "id" | "currentAmount">) => {
-    setGoals([...goals, { ...g, id: crypto.randomUUID(), currentAmount: 0 }]);
-  };
-
-  const updateGoalProgress = (id: string, amount: number) => {
-    setGoals(
-      goals.map((g) =>
-        g.id === id ? { ...g, currentAmount: g.currentAmount + amount } : g,
-      ),
-    );
-  };
-
   return (
     <FinanceContext.Provider
       value={{
-        categories,
-        addCategory,
+        currency,
+        setCurrency,
+        monthlyIncome,
+        setMonthlyIncome,
+        buckets,
+        addBucket,
+        removeBucket,
         transactions,
         addTransaction,
-        goals,
-        addGoal,
-        updateGoalProgress,
-        balance,
         geminiKey,
         setGeminiKey,
+        getBucketSpent,
+        guaranteedSavings,
       }}
     >
       {children}

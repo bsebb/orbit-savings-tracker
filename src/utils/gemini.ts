@@ -3,9 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 export async function askAccountant(
   apiKey: string,
   prompt: string,
-  balance: number,
-  transactions: any[],
-  goals: any[],
+  contextData: any,
 ): Promise<string> {
   if (!apiKey)
     return "Please enter your Gemini API key in the settings to use the Accountant.";
@@ -16,12 +14,14 @@ export async function askAccountant(
     const context = `
       You are a smart, professional, Apple-styled AI Financial Accountant.
       The user is asking you for financial advice.
+      We are using a Zero-Based Budgeting paradigm.
       Here is their current financial state:
-      - Total Balance: $${balance}
-      - Goals: ${JSON.stringify(goals)}
-      - Recent Transactions: ${JSON.stringify(transactions.slice(0, 10))}
+      - Monthly Income: ${contextData.currency}${contextData.monthlyIncome}
+      - Guaranteed Monthly Savings (Income - Allocated Buckets): ${contextData.currency}${contextData.guaranteedSavings}
+      - Expense Buckets (Allocations): ${JSON.stringify(contextData.buckets)}
+      - Recent Transactions: ${JSON.stringify(contextData.transactions)}
       
-      Provide a concise, helpful answer. If they want to buy something, evaluate if they can afford it based on their balance and goals. Don't be too preachy, keep it modern and clean.
+      Provide a concise, helpful answer formatted in Markdown. If they want to buy something, evaluate if they can afford it based on their guaranteed savings or bucket allocations. Don't be too preachy, keep it modern and clean.
     `;
 
     const response = await ai.models.generateContent({
