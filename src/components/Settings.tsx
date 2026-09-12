@@ -12,6 +12,8 @@ import {
   Upload,
   RotateCcw,
   ShieldCheck,
+  LogOut,
+  User,
 } from "lucide-react";
 
 const CURRENCIES: Currency[] = ["USD", "EUR", "MDL"];
@@ -27,6 +29,8 @@ export const Settings = () => {
     exportBackupJSON,
     importBackupJSON,
     resetAllData,
+    userEmail,
+    logout,
   } = useFinance();
 
   const sym = currencySymbols[currency];
@@ -96,6 +100,33 @@ export const Settings = () => {
       </div>
 
       <div className="space-y-5">
+        {/* Account Profile Section */}
+        <div className="p-4 bg-white/70 dark:bg-gray-900/70 rounded-2xl border border-white/40 dark:border-gray-700/40 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-indigo-500/20">
+              {userEmail ? userEmail.slice(0, 2).toUpperCase() : "U"}
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                Signed in as
+              </p>
+              <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                {userEmail}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              logout();
+              toast.success("Signed out successfully");
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+          >
+            <LogOut size={13} /> Sign Out
+          </button>
+        </div>
+
         {/* Currency Switcher */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">

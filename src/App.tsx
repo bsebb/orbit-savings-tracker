@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FinanceProvider } from "./context/FinanceContext";
+import { FinanceProvider, useFinance } from "./context/FinanceContext";
 import { ThemeProvider, useTheme } from "next-themes";
 import { Toaster } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,6 +11,7 @@ import { Timeline } from "./components/Timeline";
 import { Runway } from "./components/Runway";
 import { AccountantChat } from "./components/AccountantChat";
 import { Settings } from "./components/Settings";
+import { AuthScreen } from "./components/AuthScreen";
 import { Moon, Sun } from "lucide-react";
 
 const ThemeToggle = () => {
@@ -36,6 +37,7 @@ const ThemeToggle = () => {
 
 function AppInner() {
   const { theme, setTheme } = useTheme();
+  const { userEmail } = useFinance();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   useEffect(() => {
@@ -69,53 +71,78 @@ function AppInner() {
       />
 
       <div className="max-w-2xl mx-auto pb-24">
-        {/* Top Header */}
-        <header className="flex items-center justify-between pt-6 pb-4 px-2">
-          <div>
-            <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              Orbit
-            </h1>
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase">
-              Financial Operating System
-            </p>
-          </div>
-          <ThemeToggle />
-        </header>
+        {!userEmail ? (
+          <>
+            <header className="flex items-center justify-end pt-4 pb-2 px-2">
+              <ThemeToggle />
+            </header>
+            <AuthScreen />
+          </>
+        ) : (
+          <>
+            {/* Top Header */}
+            <header className="flex items-center justify-between pt-6 pb-4 px-2">
+              <div>
+                <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                  Orbit
+                </h1>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold tracking-wider uppercase">
+                  Financial Operating System
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab("settings")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all shadow-sm"
+                  title="Account Settings"
+                >
+                  <span className="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[10px] font-bold">
+                    {userEmail.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="hidden sm:inline truncate max-w-[140px]">
+                    {userEmail}
+                  </span>
+                </button>
+                <ThemeToggle />
+              </div>
+            </header>
 
-        {/* Tab Navigation Dock */}
-        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+            {/* Tab Navigation Dock */}
+            <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        {/* Tab Views */}
-        <main className="w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-            >
-              {activeTab === "overview" && (
-                <Overview onNavigate={setActiveTab} />
-              )}
+            {/* Tab Views */}
+            <main className="w-full">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                >
+                  {activeTab === "overview" && (
+                    <Overview onNavigate={setActiveTab} />
+                  )}
 
-              {activeTab === "envelopes" && (
-                <div className="space-y-6">
-                  <Buckets />
-                  <Subscriptions />
-                </div>
-              )}
+                  {activeTab === "envelopes" && (
+                    <div className="space-y-6">
+                      <Buckets />
+                      <Subscriptions />
+                    </div>
+                  )}
 
-              {activeTab === "timeline" && <Timeline />}
+                  {activeTab === "timeline" && <Timeline />}
 
-              {activeTab === "runway" && <Runway />}
+                  {activeTab === "runway" && <Runway />}
 
-              {activeTab === "ai" && <AccountantChat />}
+                  {activeTab === "ai" && <AccountantChat />}
 
-              {activeTab === "settings" && <Settings />}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+                  {activeTab === "settings" && <Settings />}
+                </motion.div>
+              </AnimatePresence>
+            </main>
+          </>
+        )}
       </div>
     </div>
   );

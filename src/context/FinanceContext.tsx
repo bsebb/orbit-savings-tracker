@@ -120,6 +120,9 @@ type FinanceContextType = {
   chatHistory: ChatMessage[];
   addChatMessage: (msg: Omit<ChatMessage, "timestamp">) => void;
   clearChatHistory: () => void;
+  userEmail: string | null;
+  login: (email: string) => void;
+  logout: () => void;
   exportBackupJSON: () => string;
   importBackupJSON: (jsonStr: string) => boolean;
   resetAllData: () => void;
@@ -165,6 +168,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     "orbit_v6_chat_history",
     [],
   );
+  const [userEmail, setUserEmail] = useLocalStorage<string | null>(
+    "orbit_v6_user_email",
+    null,
+  );
+
+  const login = (email: string) => {
+    setUserEmail(email.trim().toLowerCase());
+  };
+
+  const logout = () => {
+    setUserEmail(null);
+  };
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
 
@@ -362,6 +377,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         chatHistory,
         addChatMessage,
         clearChatHistory,
+        userEmail,
+        login,
+        logout,
         exportBackupJSON,
         importBackupJSON,
         resetAllData,
