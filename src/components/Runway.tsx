@@ -21,6 +21,9 @@ import {
   Circle,
   Trash2,
   Sparkles,
+  ArrowUp,
+  ArrowDown,
+  Zap,
 } from "lucide-react";
 
 ChartJS.register(
@@ -40,6 +43,7 @@ export const Runway = () => {
     addMilestone,
     toggleMilestone,
     removeMilestone,
+    moveMilestone,
   } = useFinance();
 
   const { theme } = useTheme();
@@ -166,7 +170,7 @@ export const Runway = () => {
       className="space-y-6 w-full max-w-2xl mx-auto"
     >
       {/* 4-Year Runway Projection Card */}
-      <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6">
+      <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-4 sm:p-6 overflow-hidden">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -234,122 +238,297 @@ export const Runway = () => {
         </div>
       </div>
 
-      {/* Milestones & Goals Tracker */}
-      <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-2">
-          <Target size={18} className="text-purple-500" /> Multi-Year Milestones
-        </h3>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-5">
-          Automatic timeline forecasting calculated against your current savings
-          velocity.
-        </p>
+      {/* Chronological Goals & Feasibility Roadmap */}
+      <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-4 sm:p-6 overflow-hidden space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <Target size={18} className="text-purple-500 shrink-0" />{" "}
+              Chronological Goals Roadmap
+            </h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              Sequential timeline feasibility. Goals are funded sequentially at{" "}
+              {sym}
+              {Math.max(0, Math.round(guaranteedSavings)).toLocaleString()}/mo.
+            </p>
+          </div>
+
+          {guaranteedSavings > 0 ? (
+            <span className="self-start sm:self-auto text-xs px-2.5 py-1 bg-green-500/10 text-green-600 dark:text-green-400 font-semibold rounded-full border border-green-500/20">
+              ● Feasible Pace Active
+            </span>
+          ) : (
+            <span className="self-start sm:self-auto text-xs px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold rounded-full border border-amber-500/20">
+              ⚠️ Positive Savings Needed
+            </span>
+          )}
+        </div>
+
+        {/* Popular Goal Quick Presets */}
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+            Quick Add Milestones
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              {
+                title: "📱 iPhone 16 Pro",
+                amount:
+                  currency === "MDL" ? 17000 : currency === "EUR" ? 950 : 999,
+              },
+              {
+                title: "💻 MacBook Pro M-series",
+                amount:
+                  currency === "MDL" ? 32000 : currency === "EUR" ? 1800 : 1900,
+              },
+              {
+                title: "✈️ Summer Vacation",
+                amount:
+                  currency === "MDL" ? 12000 : currency === "EUR" ? 650 : 700,
+              },
+              {
+                title: "🛡️ 3-Month Emergency Fund",
+                amount:
+                  currency === "MDL" ? 30000 : currency === "EUR" ? 1600 : 1700,
+              },
+            ].map((p) => (
+              <button
+                key={p.title}
+                type="button"
+                onClick={() => {
+                  addMilestone({ title: p.title, targetAmount: p.amount });
+                  toast.success(
+                    `Added ${p.title} (${sym}${p.amount.toLocaleString()})`,
+                  );
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/70 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all active:scale-95"
+              >
+                <span>{p.title}</span>
+                <span className="text-[10px] text-gray-400 font-bold">
+                  {sym}
+                  {p.amount.toLocaleString()}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Add Milestone Form */}
         <form
           onSubmit={handleAddMilestone}
-          className="flex gap-2.5 mb-5 flex-wrap"
+          className="flex flex-col sm:flex-row gap-2.5"
         >
           <input
             type="text"
-            placeholder="Milestone (e.g. Master's Tuition, First 100k)"
+            placeholder="Custom goal (e.g. Car Down Payment, Tuition)"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            className="flex-1 min-w-[160px] bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            className="flex-1 min-w-0 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-              {sym}
-            </span>
-            <input
-              type="number"
-              placeholder="Target"
-              value={newTarget}
-              onChange={(e) => setNewTarget(e.target.value)}
-              className="w-28 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-7 pr-3 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
+          <div className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-32 sm:flex-none">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                {sym}
+              </span>
+              <input
+                type="number"
+                placeholder="Target"
+                value={newTarget}
+                onChange={(e) => setNewTarget(e.target.value)}
+                className="w-full bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-7 pr-3 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+            </div>
+            <button
+              type="submit"
+              className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all shrink-0"
+            >
+              Add Goal
+            </button>
           </div>
-          <button
-            type="submit"
-            className="bg-purple-600 hover:bg-purple-700 active:scale-95 text-white px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all"
-          >
-            Add Goal
-          </button>
         </form>
 
-        {/* Milestone Cards */}
-        <div className="space-y-2.5">
+        {/* Chronological Milestone Sequential Cards */}
+        <div className="space-y-3">
           <AnimatePresence>
-            {milestones.map((m) => {
-              const monthsToTarget =
-                guaranteedSavings > 0
-                  ? Math.ceil(m.targetAmount / guaranteedSavings)
-                  : 0;
-              const targetDate = new Date(
-                now.getFullYear(),
-                now.getMonth() + monthsToTarget,
-                1,
-              );
-              const estLabel =
-                guaranteedSavings > 0
-                  ? targetDate.toLocaleDateString(undefined, {
+            {(() => {
+              let cumulativeUncompleted = 0;
+              let uncompletedIndex = 0;
+
+              return milestones.map((m, idx) => {
+                let rankLabel = "";
+                let estLabel = "";
+                let monthsToTarget = 0;
+                let isCurrentTarget = false;
+
+                if (!m.completed) {
+                  uncompletedIndex += 1;
+                  isCurrentTarget = uncompletedIndex === 1;
+                  rankLabel = isCurrentTarget
+                    ? "Priority #1 · In Progress"
+                    : `Priority #${uncompletedIndex} · Queued`;
+                  cumulativeUncompleted += m.targetAmount;
+
+                  if (guaranteedSavings > 0) {
+                    monthsToTarget = Math.ceil(
+                      cumulativeUncompleted / guaranteedSavings,
+                    );
+                    const targetDate = new Date(
+                      now.getFullYear(),
+                      now.getMonth() + monthsToTarget,
+                      1,
+                    );
+                    estLabel = `${targetDate.toLocaleDateString(undefined, {
                       month: "short",
                       year: "numeric",
-                    })
-                  : "Need positive savings";
+                    })} (in ${monthsToTarget} mos)`;
+                  } else {
+                    estLabel = "Need positive savings";
+                  }
+                }
 
-              return (
-                <motion.div
-                  key={m.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                    m.completed
-                      ? "bg-green-50/60 dark:bg-green-950/20 border-green-200/50 dark:border-green-800/40 opacity-75"
-                      : "bg-white/70 dark:bg-gray-900/60 border-white/40 dark:border-gray-700/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleMilestone(m.id)}
-                      className="text-gray-400 hover:text-green-500 transition-colors"
-                      title={m.completed ? "Mark incomplete" : "Mark complete"}
-                    >
-                      {m.completed ? (
-                        <CheckCircle2 size={20} className="text-green-500" />
-                      ) : (
-                        <Circle size={20} />
-                      )}
-                    </button>
-
-                    <div>
-                      <p
-                        className={`text-sm font-semibold ${m.completed ? "line-through text-gray-400" : "text-gray-900 dark:text-gray-100"}`}
-                      >
-                        {m.title}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Target: {sym}
-                        {m.targetAmount.toLocaleString()}{" "}
-                        {!m.completed &&
-                          `· Est. ${estLabel} (${monthsToTarget} mos)`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      removeMilestone(m.id);
-                      toast.error("Milestone removed");
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                return (
+                  <motion.div
+                    key={m.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      m.completed
+                        ? "bg-green-50/60 dark:bg-green-950/20 border-green-200/50 dark:border-green-800/40 opacity-75"
+                        : isCurrentTarget
+                          ? "bg-white/90 dark:bg-gray-900/80 border-indigo-500/30 shadow-md shadow-indigo-500/5"
+                          : "bg-white/70 dark:bg-gray-900/60 border-white/40 dark:border-gray-700/40"
+                    }`}
                   >
-                    <Trash2 size={14} />
-                  </button>
-                </motion.div>
-              );
-            })}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <button
+                          onClick={() => toggleMilestone(m.id)}
+                          className="text-gray-400 hover:text-green-500 transition-colors shrink-0"
+                          title={
+                            m.completed ? "Mark incomplete" : "Mark complete"
+                          }
+                        >
+                          {m.completed ? (
+                            <CheckCircle2
+                              size={22}
+                              className="text-green-500"
+                            />
+                          ) : (
+                            <Circle size={22} />
+                          )}
+                        </button>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p
+                              className={`text-sm font-bold truncate ${
+                                m.completed
+                                  ? "line-through text-gray-400"
+                                  : "text-gray-900 dark:text-gray-100"
+                              }`}
+                            >
+                              {m.title}
+                            </p>
+                            {!m.completed && (
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                                  isCurrentTarget
+                                    ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50"
+                                    : "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                                }`}
+                              >
+                                {rankLabel}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">
+                              Target: {sym}
+                              {m.targetAmount.toLocaleString()}
+                            </span>
+                            {!m.completed && (
+                              <>
+                                <span>·</span>
+                                <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                                  Est. Arrival: {estLabel}
+                                </span>
+                                {uncompletedIndex > 1 && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="text-[11px] text-gray-400">
+                                      Cumulative: {sym}
+                                      {cumulativeUncompleted.toLocaleString()}
+                                    </span>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Controls: Reorder Priority + Delete */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!m.completed && (
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              onClick={() => moveMilestone(m.id, "up")}
+                              disabled={idx === 0}
+                              className="p-1 rounded text-gray-400 hover:text-indigo-600 disabled:opacity-20 hover:bg-indigo-50 dark:hover:bg-gray-800 transition-colors"
+                              title="Move up priority"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                            <button
+                              onClick={() => moveMilestone(m.id, "down")}
+                              disabled={idx === milestones.length - 1}
+                              className="p-1 rounded text-gray-400 hover:text-indigo-600 disabled:opacity-20 hover:bg-indigo-50 dark:hover:bg-gray-800 transition-colors"
+                              title="Move down priority"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            removeMilestone(m.id);
+                            toast.error("Milestone removed");
+                          }}
+                          className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                          title="Delete milestone"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Progress & Accelerator Bar for Active Milestone */}
+                    {!m.completed &&
+                      isCurrentTarget &&
+                      guaranteedSavings > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500 gap-2 flex-wrap">
+                          <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium">
+                            <Zap size={12} /> Saving {sym}
+                            {Math.round(guaranteedSavings).toLocaleString()}/mo
+                            towards this goal
+                          </span>
+                          <span className="text-gray-400">
+                            {monthsToTarget <= 3
+                              ? "🚀 Near-term horizon"
+                              : monthsToTarget <= 12
+                                ? "🎯 Feasible within 1 year"
+                                : "📅 Multi-year milestone"}
+                          </span>
+                        </div>
+                      )}
+                  </motion.div>
+                );
+              });
+            })()}
           </AnimatePresence>
         </div>
       </div>

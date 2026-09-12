@@ -124,6 +124,7 @@ type FinanceContextType = {
   addMilestone: (m: Omit<Milestone, "id" | "completed">) => void;
   toggleMilestone: (id: string) => void;
   removeMilestone: (id: string) => void;
+  moveMilestone: (id: string, direction: "up" | "down") => void;
   chatHistory: ChatMessage[];
   addChatMessage: (msg: Omit<ChatMessage, "timestamp">) => void;
   clearChatHistory: () => void;
@@ -383,6 +384,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setMilestones(milestones.filter((m) => m.id !== id));
   };
 
+  const moveMilestone = (id: string, direction: "up" | "down") => {
+    const idx = milestones.findIndex((m) => m.id === id);
+    if (idx === -1) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= milestones.length) return;
+    const copy = [...milestones];
+    const [moved] = copy.splice(idx, 1);
+    copy.splice(targetIdx, 0, moved);
+    setMilestones(copy);
+  };
+
   const addChatMessage = (msg: Omit<ChatMessage, "timestamp">) => {
     setChatHistory((prev) => [
       ...prev,
@@ -494,6 +506,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         addMilestone,
         toggleMilestone,
         removeMilestone,
+        moveMilestone,
         chatHistory,
         addChatMessage,
         clearChatHistory,

@@ -119,7 +119,7 @@ export const Timeline = () => {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 280, damping: 24 }}
-      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto space-y-6"
+      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-4 sm:p-6 w-full max-w-2xl mx-auto space-y-6 overflow-hidden"
     >
       {/* Header & Month Navigator */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -301,7 +301,7 @@ export const Timeline = () => {
                         removeTransaction(t.id);
                         toast.error("Transaction removed");
                       }}
-                      className="opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
+                      className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
                       title="Delete Transaction"
                     >
                       <Trash2 size={14} />

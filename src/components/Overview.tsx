@@ -110,8 +110,27 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
 
   const bucketOptions = buckets.map((b) => ({ value: b.id, label: b.name }));
 
-  // Next active milestone
-  const nextMilestone = milestones.find((m) => !m.completed);
+  // Sequential active milestones
+  const uncompletedMilestones = milestones.filter((m) => !m.completed);
+  const primaryMilestone = uncompletedMilestones[0];
+  const queuedMilestone = uncompletedMilestones[1];
+
+  let primaryMonths = 0;
+  let primaryEst = "";
+  if (primaryMilestone && guaranteedSavings > 0) {
+    primaryMonths = Math.ceil(
+      primaryMilestone.targetAmount / guaranteedSavings,
+    );
+    const date = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + primaryMonths,
+      1,
+    );
+    primaryEst = date.toLocaleDateString(undefined, {
+      month: "short",
+      year: "numeric",
+    });
+  }
 
   return (
     <div className="space-y-6 w-full max-w-2xl mx-auto">
@@ -374,8 +393,8 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
         </div>
       </motion.div>
 
-      {/* Next Milestone Card */}
-      {nextMilestone && (
+      {/* Sequential Milestone Roadmap Card */}
+      {primaryMilestone && (
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -385,31 +404,46 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
             damping: 24,
             delay: 0.15,
           }}
-          className="bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-transparent border border-indigo-500/20 dark:border-indigo-500/30 rounded-3xl p-6 flex items-center justify-between gap-4"
+          className="bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-transparent border border-indigo-500/20 dark:border-indigo-500/30 rounded-3xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden"
         >
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-md shadow-indigo-500/25">
+          <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+            <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-md shadow-indigo-500/25 shrink-0">
               <Target size={22} />
             </div>
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Target Milestone
-              </span>
-              <h4 className="text-base font-bold text-gray-900 dark:text-white">
-                {nextMilestone.title}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                  Priority #1 Milestone
+                </span>
+                {primaryMonths > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 font-bold rounded-full border border-green-500/20">
+                    Est. {primaryEst} ({primaryMonths} mos)
+                  </span>
+                )}
+              </div>
+              <h4 className="text-base font-bold text-gray-900 dark:text-white truncate mt-0.5">
+                {primaryMilestone.title}
               </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Target: {sym}
-                {nextMilestone.targetAmount.toLocaleString()}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Target:{" "}
+                <span className="font-semibold text-gray-800 dark:text-gray-200">
+                  {sym}
+                  {primaryMilestone.targetAmount.toLocaleString()}
+                </span>
+                {queuedMilestone && (
+                  <span className="text-[11px] text-gray-400 block sm:inline sm:ml-2">
+                    · Queued next: {queuedMilestone.title}
+                  </span>
+                )}
               </p>
             </div>
           </div>
 
           <button
             onClick={() => onNavigate("runway")}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-semibold flex items-center gap-1 transition-all shrink-0"
+            className="self-start sm:self-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 shadow-sm"
           >
-            View Runway <ArrowRight size={12} />
+            View Roadmap <ArrowRight size={12} />
           </button>
         </motion.div>
       )}

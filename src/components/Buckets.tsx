@@ -64,7 +64,7 @@ export const Buckets = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 24, delay: 0.1 }}
-      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto"
+      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-4 sm:p-6 w-full max-w-2xl mx-auto overflow-hidden"
     >
       <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-5 flex items-center gap-2">
         <LayoutGrid size={20} className="text-indigo-500" /> Expense Buckets
@@ -88,32 +88,37 @@ export const Buckets = () => {
       )}
 
       {/* Custom bucket form */}
-      <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 mb-6"
+      >
         <input
           type="text"
           placeholder="Custom bucket name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="flex-1 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          className="flex-1 min-w-0 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-            {sym}
-          </span>
-          <input
-            type="number"
-            placeholder="0"
-            value={allocated}
-            onChange={(e) => setAllocated(e.target.value)}
-            className="w-28 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-7 pr-3 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
+        <div className="flex gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-28 sm:flex-none">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              {sym}
+            </span>
+            <input
+              type="number"
+              placeholder="0"
+              value={allocated}
+              onChange={(e) => setAllocated(e.target.value)}
+              className="w-full bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-7 pr-3 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+          </div>
+          <button
+            type="submit"
+            className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-5 py-3 rounded-2xl text-sm font-semibold transition-all shrink-0"
+          >
+            Add
+          </button>
         </div>
-        <button
-          type="submit"
-          className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-5 py-3 rounded-2xl text-sm font-semibold transition-all"
-        >
-          Add
-        </button>
       </form>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -181,7 +186,7 @@ export const Buckets = () => {
                             setEditingId(b.id);
                             setEditVal(String(b.allocated));
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+                          className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
                         >
                           <Pencil size={13} />
                         </button>
@@ -190,7 +195,7 @@ export const Buckets = () => {
                             removeBucket(b.id);
                             toast.error(`${b.name} removed`);
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
+                          className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
                         >
                           <Trash2 size={13} />
                         </button>
