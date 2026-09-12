@@ -10,7 +10,7 @@ async function generateWithRetry(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents,
       });
       return response.text ?? "I couldn't generate a response.";
