@@ -6,7 +6,14 @@ export type Currency = "USD" | "EUR" | "MDL";
 export const currencySymbols: Record<Currency, string> = {
   USD: "$",
   EUR: "€",
-  MDL: "MDL",
+  MDL: "M",
+};
+
+// USD-based exchange rates (approximate, hardcoded for local-first app)
+const RATES_TO_USD: Record<Currency, number> = {
+  USD: 1,
+  EUR: 1 / 0.92, // 1 EUR ≈ 1.087 USD
+  MDL: 1 / 17.8, // 1 MDL ≈ 0.0562 USD
 };
 
 export type Bucket = {
@@ -52,7 +59,7 @@ type FinanceContextType = {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
-  const [currency, setCurrency] = useLocalStorage<Currency>(
+  const [currency, _setCurrency] = useLocalStorage<Currency>(
     "orbit_v5_currency",
     "USD",
   );
@@ -110,6 +117,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       { ...t, id: crypto.randomUUID(), date: new Date().toISOString() },
       ...transactions,
     ]);
+  };
+
+  // Convert all stored monetary values when switching currency
+  const setCurrency = (newCurrency: Currency) => {
+    if (newCurrency === currency) return;
+    const factor = RATES_TO_USD[currency] / RATES_TO_USD[newCurrency];
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    setMonthlyIncome(round2(monthlyIncome * factor));
+    setBuckets(
+      buckets.map((b) => ({ ...b, allocated: round2(b.allocated * factor) })),
+    );
+    _setCurrency(newCurrency);
   };
 
   return (
