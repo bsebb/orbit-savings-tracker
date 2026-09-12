@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useTheme } from "next-themes";
 import { useFinance, currencySymbols } from "../context/FinanceContext";
 import { Line } from "react-chartjs-2";
 import {
@@ -24,6 +25,8 @@ ChartJS.register(
 
 export const Projection = () => {
   const { monthlyIncome, buckets, currency } = useFinance();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const sym = currencySymbols[currency];
   const [monthsAhead, setMonthsAhead] = useState(12);
   const [expenseAdj, setExpenseAdj] = useState(0);
@@ -56,9 +59,26 @@ export const Projection = () => {
 
   const options = {
     responsive: true,
+    interaction: { mode: "index" as const, intersect: false },
     plugins: {
       legend: { display: false },
-      tooltip: { mode: "index" as const, intersect: false },
+      tooltip: {
+        backgroundColor: isDark
+          ? "rgba(17,24,39,0.92)"
+          : "rgba(255,255,255,0.92)",
+        borderColor: isDark ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.25)",
+        borderWidth: 1,
+        titleColor: isDark ? "#e5e7eb" : "#111827",
+        bodyColor: isDark ? "#9ca3af" : "#6b7280",
+        padding: { x: 14, y: 10 },
+        cornerRadius: 14,
+        displayColors: false,
+        callbacks: {
+          title: (items: { label: string }[]) => items[0]?.label ?? "",
+          label: (item: { raw: unknown }) =>
+            `${sym}${Number(item.raw).toLocaleString()}`,
+        },
+      },
     },
     scales: {
       y: {

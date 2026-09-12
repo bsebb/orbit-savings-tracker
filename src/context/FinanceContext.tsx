@@ -26,6 +26,7 @@ export type Subscription = {
   name: string;
   amount: number;
   icon: string;
+  currency: Currency; // the currency this charge actually bills in
 };
 
 export type Transaction = {
@@ -95,10 +96,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   );
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
-  const totalSubscriptions = subscriptions.reduce(
-    (sum, s) => sum + s.amount,
-    0,
-  );
+  // Each subscription stores its own native currency — convert to app currency on the fly
+  const totalSubscriptions = subscriptions.reduce((sum, s) => {
+    const subCurrency = s.currency ?? currency; // legacy subs without currency field fall back to app currency
+    const converted =
+      s.amount * (RATES_TO_USD[subCurrency] / RATES_TO_USD[currency]);
+    return sum + converted;
+  }, 0);
   const oneOffIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -146,9 +150,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setBuckets(
       buckets.map((b) => ({ ...b, allocated: r2(b.allocated * factor) })),
     );
-    setSubscriptions(
-      subscriptions.map((s) => ({ ...s, amount: r2(s.amount * factor) })),
-    );
+    // Subscriptions are NOT converted — each stores its own native currency
     _setCurrency(newCurrency);
   };
 
