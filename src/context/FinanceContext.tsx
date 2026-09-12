@@ -3,8 +3,10 @@ import {
   useContext,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from "react";
+import { toast } from "sonner";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { fetchCloudUserData, syncCloudUserData } from "../utils/api";
 
@@ -133,6 +135,9 @@ type FinanceContextType = {
   login: (email: string, remember?: boolean) => void;
   logout: () => void;
   cloudSyncStatus: "synced" | "syncing" | "offline";
+  saveStatus: "idle" | "syncing" | "saved" | "offline";
+  canUndo: boolean;
+  undo: () => string | null;
   lastSyncedAt: string | null;
   syncToCloudNow: () => Promise<void>;
   exportBackupJSON: () => string;
@@ -218,39 +223,149 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem("orbit_v6_session_email");
   };
 
+  type StateSnapshot = {
+    description: string;
+    buckets: Bucket[];
+    subscriptions: Subscription[];
+    transactions: Transaction[];
+    monthlyIncome: number;
+    currency: Currency;
+    milestones: Milestone[];
+  };
+
+  const [undoStack, setUndoStack] = useState<StateSnapshot[]>([]);
+  const isHydratedRef = useRef(false);
+
   const [cloudSyncStatus, setCloudSyncStatus] = useState<
     "synced" | "syncing" | "offline"
   >("synced");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "syncing" | "saved" | "offline"
+  >("idle");
   const [lastSyncedAt, setLastSyncedAt] = useLocalStorage<string | null>(
     "orbit_v6_last_synced",
     null,
   );
 
-  // 1. On login: hydrate state from Upstash Redis
+  const recordSnapshot = (description: string) => {
+    setUndoStack((prev) => [
+      ...prev.slice(-19),
+      {
+        description,
+        buckets,
+        subscriptions,
+        transactions,
+        monthlyIncome,
+        currency,
+        milestones,
+      },
+    ]);
+  };
+
+  const undo = () => {
+    if (undoStack.length === 0) return null;
+    const last = undoStack[undoStack.length - 1];
+    setUndoStack((prev) => prev.slice(0, -1));
+
+    setBuckets(last.buckets);
+    setSubscriptions(last.subscriptions);
+    setTransactions(last.transactions);
+    setMonthlyIncome(last.monthlyIncome);
+    _setCurrency(last.currency);
+    setMilestones(last.milestones);
+
+    toast.info(`Undone: ${last.description}`);
+    return last.description;
+  };
+
+  // Global keyboard shortcut: Ctrl+Z / Cmd+Z to undo
   useEffect(() => {
-    if (!userEmail) return;
-    fetchCloudUserData(userEmail).then((cloudData) => {
-      if (cloudData) {
-        if (cloudData.currency) _setCurrency(cloudData.currency);
-        if (typeof cloudData.monthlyIncome === "number")
-          setMonthlyIncome(cloudData.monthlyIncome);
-        if (Array.isArray(cloudData.buckets) && cloudData.buckets.length > 0)
-          setBuckets(cloudData.buckets);
-        if (Array.isArray(cloudData.subscriptions))
-          setSubscriptions(cloudData.subscriptions);
-        if (Array.isArray(cloudData.transactions))
-          setTransactions(cloudData.transactions);
-        if (Array.isArray(cloudData.milestones))
-          setMilestones(cloudData.milestones);
-        if (cloudData.lastSyncedAt) setLastSyncedAt(cloudData.lastSyncedAt);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.key.toLowerCase() === "z" &&
+        !e.shiftKey
+      ) {
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable)
+        ) {
+          return;
+        }
+        if (undoStack.length > 0) {
+          e.preventDefault();
+          undo();
+        }
       }
-    });
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undoStack]);
+
+  // 1. On login: hydrate state from Upstash Redis and merge safely
+  useEffect(() => {
+    if (!userEmail) {
+      isHydratedRef.current = true;
+      return;
+    }
+    let isMounted = true;
+    fetchCloudUserData(userEmail)
+      .then((cloudData) => {
+        if (!isMounted) return;
+        if (cloudData) {
+          if (cloudData.currency) _setCurrency(cloudData.currency);
+          if (typeof cloudData.monthlyIncome === "number")
+            setMonthlyIncome(cloudData.monthlyIncome);
+          if (Array.isArray(cloudData.buckets) && cloudData.buckets.length > 0)
+            setBuckets(cloudData.buckets);
+          if (Array.isArray(cloudData.subscriptions))
+            setSubscriptions(cloudData.subscriptions);
+
+          // Deep merge transactions by ID so fresh offline/local transactions are never overwritten
+          if (Array.isArray(cloudData.transactions)) {
+            setTransactions((localTx) => {
+              const txMap = new Map<string, Transaction>();
+              cloudData.transactions.forEach((t: Transaction) =>
+                txMap.set(t.id, t),
+              );
+              localTx.forEach((t: Transaction) => txMap.set(t.id, t));
+              return Array.from(txMap.values()).sort(
+                (a, b) =>
+                  new Date(b.date).getTime() - new Date(a.date).getTime(),
+              );
+            });
+          }
+
+          if (Array.isArray(cloudData.milestones))
+            setMilestones(cloudData.milestones);
+          if (cloudData.lastSyncedAt) setLastSyncedAt(cloudData.lastSyncedAt);
+        }
+      })
+      .catch((err) => {
+        console.warn("Cloud hydration note:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          isHydratedRef.current = true;
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [userEmail]);
 
-  // 2. Debounced auto-sync to Upstash Redis
+  // 2. Debounced auto-sync (1-second persistence) to Upstash Redis
   useEffect(() => {
     if (!userEmail) return;
+    if (!isHydratedRef.current) return;
+
+    setSaveStatus("syncing");
     setCloudSyncStatus("syncing");
+
     const timer = setTimeout(async () => {
       const now = new Date().toISOString();
       const ok = await syncCloudUserData(userEmail, {
@@ -263,12 +378,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         lastSyncedAt: now,
       });
       if (ok) {
+        setSaveStatus("saved");
         setCloudSyncStatus("synced");
         setLastSyncedAt(now);
+        const resetTimer = setTimeout(() => setSaveStatus("idle"), 2500);
+        return () => clearTimeout(resetTimer);
       } else {
+        setSaveStatus("offline");
         setCloudSyncStatus("offline");
+        const resetTimer = setTimeout(() => setSaveStatus("idle"), 3500);
+        return () => clearTimeout(resetTimer);
       }
-    }, 1200);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [
@@ -283,6 +404,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const syncToCloudNow = async () => {
     if (!userEmail) return;
+    setSaveStatus("syncing");
     setCloudSyncStatus("syncing");
     const now = new Date().toISOString();
     const ok = await syncCloudUserData(userEmail, {
@@ -295,10 +417,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       lastSyncedAt: now,
     });
     if (ok) {
+      setSaveStatus("saved");
       setCloudSyncStatus("synced");
       setLastSyncedAt(now);
+      setTimeout(() => setSaveStatus("idle"), 2500);
     } else {
+      setSaveStatus("offline");
       setCloudSyncStatus("offline");
+      setTimeout(() => setSaveStatus("idle"), 3500);
     }
   };
 
@@ -340,32 +466,49 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  const addBucket = (b: Omit<Bucket, "id">) =>
+  const addBucket = (b: Omit<Bucket, "id">) => {
+    recordSnapshot(`Add envelope: ${b.name}`);
     setBuckets([...buckets, { ...b, id: crypto.randomUUID() }]);
+  };
+
   const removeBucket = (id: string) => {
+    const target = buckets.find((b) => b.id === id);
+    recordSnapshot(`Remove envelope: ${target?.name || "item"}`);
     setBuckets(buckets.filter((b) => b.id !== id));
     setTransactions(transactions.filter((t) => t.bucketId !== id));
   };
-  const updateBucket = (id: string, data: Partial<Omit<Bucket, "id">>) =>
-    setBuckets(buckets.map((b) => (b.id === id ? { ...b, ...data } : b)));
 
-  const addSubscription = (s: Omit<Subscription, "id">) =>
+  const updateBucket = (id: string, data: Partial<Omit<Bucket, "id">>) => {
+    recordSnapshot("Update envelope");
+    setBuckets(buckets.map((b) => (b.id === id ? { ...b, ...data } : b)));
+  };
+
+  const addSubscription = (s: Omit<Subscription, "id">) => {
+    recordSnapshot(`Add subscription: ${s.name}`);
     setSubscriptions([...subscriptions, { ...s, id: crypto.randomUUID() }]);
-  const removeSubscription = (id: string) =>
+  };
+
+  const removeSubscription = (id: string) => {
+    const target = subscriptions.find((s) => s.id === id);
+    recordSnapshot(`Remove subscription: ${target?.name || "item"}`);
     setSubscriptions(subscriptions.filter((s) => s.id !== id));
+  };
 
   const addTransaction = (
     t: Omit<Transaction, "id" | "date"> & { date?: string },
   ) => {
+    recordSnapshot(t.type === "expense" ? "Log expense" : "Add income");
     const date = t.date || new Date().toISOString();
     setTransactions([{ ...t, id: crypto.randomUUID(), date }, ...transactions]);
   };
 
   const removeTransaction = (id: string) => {
+    recordSnapshot("Delete transaction");
     setTransactions(transactions.filter((t) => t.id !== id));
   };
 
   const addMilestone = (m: Omit<Milestone, "id" | "completed">) => {
+    recordSnapshot(`Add goal: ${m.title}`);
     setMilestones([
       ...milestones,
       { ...m, id: crypto.randomUUID(), completed: false },
@@ -373,6 +516,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleMilestone = (id: string) => {
+    recordSnapshot("Toggle goal");
     setMilestones(
       milestones.map((m) =>
         m.id === id ? { ...m, completed: !m.completed } : m,
@@ -381,10 +525,13 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   };
 
   const removeMilestone = (id: string) => {
+    const target = milestones.find((m) => m.id === id);
+    recordSnapshot(`Remove goal: ${target?.title || "item"}`);
     setMilestones(milestones.filter((m) => m.id !== id));
   };
 
   const moveMilestone = (id: string, direction: "up" | "down") => {
+    recordSnapshot("Reorder goals");
     const idx = milestones.findIndex((m) => m.id === id);
     if (idx === -1) return;
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
@@ -515,6 +662,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         cloudSyncStatus,
+        saveStatus,
+        canUndo: undoStack.length > 0,
+        undo,
         lastSyncedAt,
         syncToCloudNow,
         exportBackupJSON,

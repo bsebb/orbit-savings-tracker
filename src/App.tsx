@@ -12,6 +12,7 @@ import { Runway } from "./components/Runway";
 import { AccountantChat } from "./components/AccountantChat";
 import { Settings } from "./components/Settings";
 import { AuthScreen } from "./components/AuthScreen";
+import { SyncStatusBadge } from "./components/SyncStatusBadge";
 import { Moon, Sun } from "lucide-react";
 
 const ThemeToggle = () => {
@@ -89,6 +90,7 @@ function AppInner() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <SyncStatusBadge />
                 <button
                   onClick={() => setActiveTab("settings")}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/60 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-700/50 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:scale-105 active:scale-95 transition-all shadow-sm"

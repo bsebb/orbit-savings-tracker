@@ -27,6 +27,7 @@ export const Timeline = () => {
     selectedMonth,
     setSelectedMonth,
     allMonths,
+    undo,
   } = useFinance();
 
   const sym = currencySymbols[currency];
@@ -299,7 +300,12 @@ export const Timeline = () => {
                     <button
                       onClick={() => {
                         removeTransaction(t.id);
-                        toast.error("Transaction removed");
+                        toast.info("Transaction removed", {
+                          action: {
+                            label: "Undo",
+                            onClick: () => undo(),
+                          },
+                        });
                       }}
                       className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
                       title="Delete Transaction"

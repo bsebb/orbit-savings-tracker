@@ -37,6 +37,7 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
     setSelectedMonth,
     addTransaction,
     milestones,
+    undo,
   } = useFinance();
 
   const sym = currencySymbols[currency];
@@ -101,7 +102,13 @@ export const Overview = ({ onNavigate }: OverviewProps) => {
       quickType === "expense"
         ? `${sym}${quickAmount} logged to ${buckets.find((b) => b.id === quickBucket)?.name}`
         : `${sym}${quickAmount} one-off income recorded`,
-      { icon: quickType === "expense" ? "💸" : "💰" },
+      {
+        icon: quickType === "expense" ? "💸" : "💰",
+        action: {
+          label: "Undo",
+          onClick: () => undo(),
+        },
+      },
     );
 
     setQuickAmount("");

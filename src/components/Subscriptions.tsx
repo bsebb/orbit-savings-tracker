@@ -241,6 +241,7 @@ export const Subscriptions = () => {
     removeSubscription,
     totalSubscriptions,
     currency,
+    undo,
   } = useFinance();
 
   const appSym = currencySymbols[currency];
@@ -285,6 +286,12 @@ export const Subscriptions = () => {
 
     toast.success(
       `${item.icon} ${item.name} added (${appSym}${convertedAmount}/mo)`,
+      {
+        action: {
+          label: "Undo",
+          onClick: () => undo(),
+        },
+      },
     );
   };
 
@@ -396,7 +403,12 @@ export const Subscriptions = () => {
                     <button
                       onClick={() => {
                         removeSubscription(s.id);
-                        toast.error(`${s.name} removed`);
+                        toast.info(`${s.name} removed`, {
+                          action: {
+                            label: "Undo",
+                            onClick: () => undo(),
+                          },
+                        });
                       }}
                       className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
                       title="Remove subscription"

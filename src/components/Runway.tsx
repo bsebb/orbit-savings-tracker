@@ -44,6 +44,7 @@ export const Runway = () => {
     toggleMilestone,
     removeMilestone,
     moveMilestone,
+    undo,
   } = useFinance();
 
   const { theme } = useTheme();
@@ -299,6 +300,12 @@ export const Runway = () => {
                   addMilestone({ title: p.title, targetAmount: p.amount });
                   toast.success(
                     `Added ${p.title} (${sym}${p.amount.toLocaleString()})`,
+                    {
+                      action: {
+                        label: "Undo",
+                        onClick: () => undo(),
+                      },
+                    },
                   );
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/70 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-400 transition-all active:scale-95"
@@ -496,7 +503,12 @@ export const Runway = () => {
                         <button
                           onClick={() => {
                             removeMilestone(m.id);
-                            toast.error("Milestone removed");
+                            toast.info("Milestone removed", {
+                              action: {
+                                label: "Undo",
+                                onClick: () => undo(),
+                              },
+                            });
                           }}
                           className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                           title="Delete milestone"

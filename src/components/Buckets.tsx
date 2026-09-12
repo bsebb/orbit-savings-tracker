@@ -85,6 +85,7 @@ export const Buckets = () => {
     currency,
     monthlyIncome,
     addTransaction,
+    undo,
   } = useFinance();
 
   const totalAllocated = buckets.reduce((acc, b) => acc + b.allocated, 0);
@@ -168,7 +169,12 @@ export const Buckets = () => {
       note: logNote.trim() || undefined,
     });
 
-    toast.success(`Logged ${sym}${num.toLocaleString()} to ${bucketName}`);
+    toast.success(`Logged ${sym}${num.toLocaleString()} to ${bucketName}`, {
+      action: {
+        label: "Undo",
+        onClick: () => undo(),
+      },
+    });
     setLogAmount("");
     setLogNote("");
     setLoggingBucketId(null);
@@ -336,7 +342,12 @@ export const Buckets = () => {
                           <button
                             onClick={() => {
                               removeBucket(b.id);
-                              toast.error(`${b.name} removed`);
+                              toast.info(`${b.name} removed`, {
+                                action: {
+                                  label: "Undo",
+                                  onClick: () => undo(),
+                                },
+                              });
                             }}
                             className="opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30"
                             title="Delete envelope"
