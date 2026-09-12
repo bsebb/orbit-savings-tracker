@@ -191,7 +191,7 @@ app.get('/api/user/data', async (req, res) => {
 });
 
 /**
- * Sync user data to Upstash Redis
+ * Sync user data to Upstash Redis with conflict and default-overwrite protection
  */
 app.post('/api/user/sync', async (req, res) => {
   try {
@@ -201,18 +201,60 @@ app.post('/api/user/sync', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const payload = typeof data === 'string' ? data : JSON.stringify(data);
+    const incoming = typeof data === 'string' ? JSON.parse(data) : data;
+
+    // Fetch existing stored data
+    let existing = null;
+    if (redis) {
+      const stored = await redis.get(`data:${cleanEmail}`);
+      existing = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    } else {
+      existing = memoryStore.get(`data:${cleanEmail}`) || null;
+    }
+
+    if (existing && existing.lastSyncedAt && incoming && incoming.lastSyncedAt) {
+      const existingTime = new Date(existing.lastSyncedAt).getTime();
+      const incomingTime = new Date(incoming.lastSyncedAt).getTime();
+
+      // Guard 1: Reject stale timestamps (e.g. out-of-order delayed packets)
+      if (incomingTime < existingTime && !incoming.isExplicitReset) {
+        return res.json({
+          success: true,
+          message: 'Cloud has newer data; rejected stale push',
+          data: existing,
+          syncedAt: existing.lastSyncedAt,
+        });
+      }
+
+      // Guard 2: Reject default-values overwrite if cloud already has customized user data
+      const existingTxCount = Array.isArray(existing.transactions) ? existing.transactions.length : 0;
+      const incomingTxCount = Array.isArray(incoming.transactions) ? incoming.transactions.length : 0;
+      const isDefaultIncoming = incoming.monthlyIncome === 3500 && incoming.currency === 'USD' && incomingTxCount === 0;
+      const hasCustomExisting = existingTxCount > 0 || existing.monthlyIncome !== 3500 || existing.currency !== 'USD';
+
+      if (isDefaultIncoming && hasCustomExisting && !incoming.isExplicitReset) {
+        console.log(`🛡️ Blocked default overwrite for ${cleanEmail}. Preserving cloud data.`);
+        return res.json({
+          success: true,
+          message: 'Protected cloud data against uninitialized default values',
+          data: existing,
+          syncedAt: existing.lastSyncedAt,
+        });
+      }
+    }
+
+    const payload = JSON.stringify(incoming);
 
     if (redis) {
       await redis.set(`data:${cleanEmail}`, payload);
     } else {
-      memoryStore.set(`data:${cleanEmail}`, typeof data === 'string' ? JSON.parse(data) : data);
+      memoryStore.set(`data:${cleanEmail}`, incoming);
     }
 
     res.json({
       success: true,
       message: 'Cloud data synchronized',
-      syncedAt: new Date().toISOString(),
+      syncedAt: incoming.lastSyncedAt || new Date().toISOString(),
     });
   } catch (err) {
     console.error('Sync cloud data error:', err);
@@ -231,7 +273,11 @@ app.use((req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`🪐 Orbit Backend running on port ${PORT}`);
-  console.log(`🔗 Health Check URL for UptimeRobot: http://localhost:${PORT}/api/health`);
-});
+export default app;
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🪐 Orbit Backend running on port ${PORT}`);
+    console.log(`🔗 Health Check URL for UptimeRobot: http://localhost:${PORT}/api/health`);
+  });
+}

@@ -203,6 +203,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const login = (email: string, remember: boolean = true) => {
     const cleanEmail = email.trim().toLowerCase();
+    isHydratedRef.current = false;
+    isApplyingCloudDataRef.current = true;
     setRememberDevice(remember);
     setUserEmail(cleanEmail);
     if (remember) {
@@ -370,25 +372,85 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }, 1800);
   };
 
-  // 1. On login: hydrate state from Upstash Redis
+  // 1. On login or app launch: hydrate state from Upstash Redis
   useEffect(() => {
     if (!userEmail) {
-      isHydratedRef.current = true;
       return;
     }
     let isMounted = true;
+    isApplyingCloudDataRef.current = true;
+
     fetchCloudUserData(userEmail)
-      .then((cloudData) => {
+      .then(async (cloudData) => {
         if (!isMounted) return;
-        if (cloudData) {
+
+        // Check if local device has user-customized non-default data
+        const hasLocalCustomData =
+          currency !== "USD" ||
+          monthlyIncome !== 3500 ||
+          transactionsRef.current.length > 0 ||
+          buckets.length !== DEFAULT_BUCKETS.length;
+
+        // Check if cloud has real customized user data
+        const hasCloudCustomData =
+          cloudData &&
+          (cloudData.currency !== "USD" ||
+            cloudData.monthlyIncome !== 3500 ||
+            (Array.isArray(cloudData.transactions) &&
+              cloudData.transactions.length > 0) ||
+            (Array.isArray(cloudData.buckets) && cloudData.buckets.length > 0));
+
+        if (cloudData && hasCloudCustomData) {
+          // Canonical cloud data takes precedence: apply cleanly
+          applyCloudData(cloudData);
+        } else if (hasLocalCustomData) {
+          // Cloud has no custom data, but this device does: seed cloud from local device
+          const now = new Date().toISOString();
+          const res = await syncCloudUserData(userEmail, {
+            currency,
+            monthlyIncome,
+            buckets,
+            subscriptions,
+            transactions: transactionsRef.current,
+            milestones,
+            lastSyncedAt: now,
+          });
+          if (res.success) {
+            setLastSyncedAt(now);
+            lastSyncedAtRef.current = now;
+            setCloudSyncStatus("synced");
+            setSaveStatus("saved");
+            setTimeout(() => setSaveStatus("idle"), 2000);
+          }
+          isHydratedRef.current = true;
+          isApplyingCloudDataRef.current = false;
+        } else if (cloudData) {
+          // Both are default state; adopt cloud snapshot
           applyCloudData(cloudData);
         } else {
+          // Brand new profile on both ends: seed initial baseline
+          const now = new Date().toISOString();
+          await syncCloudUserData(userEmail, {
+            currency,
+            monthlyIncome,
+            buckets,
+            subscriptions,
+            transactions: [],
+            milestones,
+            lastSyncedAt: now,
+          });
+          setLastSyncedAt(now);
+          lastSyncedAtRef.current = now;
           isHydratedRef.current = true;
+          isApplyingCloudDataRef.current = false;
         }
       })
       .catch((err) => {
         console.warn("Cloud hydration note:", err);
-        if (isMounted) isHydratedRef.current = true;
+        if (isMounted) {
+          isHydratedRef.current = true;
+          isApplyingCloudDataRef.current = false;
+        }
       });
 
     return () => {
@@ -462,7 +524,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const timer = setTimeout(async () => {
       if (isApplyingCloudDataRef.current) return;
       const now = new Date().toISOString();
-      const ok = await syncCloudUserData(userEmail, {
+      const res = await syncCloudUserData(userEmail, {
         currency,
         monthlyIncome,
         buckets,
@@ -471,13 +533,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         milestones,
         lastSyncedAt: now,
       });
-      if (ok) {
-        setSaveStatus("saved");
-        setCloudSyncStatus("synced");
-        setLastSyncedAt(now);
-        lastSyncedAtRef.current = now;
-        const resetTimer = setTimeout(() => setSaveStatus("idle"), 2500);
-        return () => clearTimeout(resetTimer);
+      if (res.success) {
+        if (res.cloudData) {
+          // Backend protected against an overwrite and returned cloud canonical data
+          applyCloudData(res.cloudData);
+        } else {
+          setSaveStatus("saved");
+          setCloudSyncStatus("synced");
+          setLastSyncedAt(now);
+          lastSyncedAtRef.current = now;
+          const resetTimer = setTimeout(() => setSaveStatus("idle"), 2500);
+          return () => clearTimeout(resetTimer);
+        }
       } else {
         setSaveStatus("offline");
         setCloudSyncStatus("offline");
@@ -497,12 +564,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     milestones,
   ]);
 
-  const syncToCloudNow = async () => {
+  const syncToCloudNow = async (options?: { isExplicitReset?: boolean }) => {
     if (!userEmail) return;
     setSaveStatus("syncing");
     setCloudSyncStatus("syncing");
     const now = new Date().toISOString();
-    const ok = await syncCloudUserData(userEmail, {
+    const res = await syncCloudUserData(userEmail, {
       currency,
       monthlyIncome,
       buckets,
@@ -510,13 +577,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       transactions,
       milestones,
       lastSyncedAt: now,
+      isExplicitReset: options?.isExplicitReset,
     });
-    if (ok) {
-      setSaveStatus("saved");
-      setCloudSyncStatus("synced");
-      setLastSyncedAt(now);
-      lastSyncedAtRef.current = now;
-      setTimeout(() => setSaveStatus("idle"), 2500);
+    if (res.success) {
+      if (res.cloudData) {
+        applyCloudData(res.cloudData);
+      } else {
+        setSaveStatus("saved");
+        setCloudSyncStatus("synced");
+        setLastSyncedAt(now);
+        lastSyncedAtRef.current = now;
+        setTimeout(() => setSaveStatus("idle"), 2500);
+      }
     } else {
       setSaveStatus("offline");
       setCloudSyncStatus("offline");
@@ -713,7 +785,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const resetAllData = () => {
+  const resetAllData = async () => {
+    recordSnapshot("Reset all data");
     _setCurrency("USD");
     setMonthlyIncome(3500);
     setBuckets(DEFAULT_BUCKETS);
@@ -721,6 +794,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setTransactions([]);
     setMilestones(DEFAULT_MILESTONES);
     setChatHistory([]);
+    if (userEmail) {
+      const now = new Date().toISOString();
+      await syncCloudUserData(userEmail, {
+        currency: "USD",
+        monthlyIncome: 3500,
+        buckets: DEFAULT_BUCKETS,
+        subscriptions: [],
+        transactions: [],
+        milestones: DEFAULT_MILESTONES,
+        lastSyncedAt: now,
+        isExplicitReset: true,
+      });
+      setLastSyncedAt(now);
+      lastSyncedAtRef.current = now;
+    }
   };
 
   return (

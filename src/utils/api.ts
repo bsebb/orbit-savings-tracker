@@ -75,22 +75,32 @@ export async function fetchCloudUserData(email: string): Promise<any | null> {
   }
 }
 
+export type SyncResponse = {
+  success: boolean;
+  cloudData?: any;
+};
+
 /**
  * Sync user financial profile to Upstash Redis for multi-device access
  */
 export async function syncCloudUserData(
   email: string,
   data: any,
-): Promise<boolean> {
+): Promise<SyncResponse> {
   try {
     const res = await fetch(`${API_BASE}/api/user/sync`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, data }),
     });
-    return res.ok;
+    if (!res.ok) return { success: false };
+    const json = await res.json();
+    return {
+      success: true,
+      cloudData: json.data,
+    };
   } catch {
-    return false;
+    return { success: false };
   }
 }
 
