@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FinanceProvider } from "./context/FinanceContext";
 import { ThemeProvider, useTheme } from "next-themes";
 import { Toaster } from "sonner";
@@ -35,8 +35,19 @@ const ThemeToggle = () => {
 };
 
 function AppInner() {
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.colorScheme) {
+        setTheme(tg.colorScheme);
+      }
+    }
+  }, [setTheme]);
 
   return (
     <div className="min-h-screen relative p-4 sm:p-8">
