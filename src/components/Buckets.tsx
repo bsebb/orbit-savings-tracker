@@ -478,7 +478,7 @@ export const Buckets = () => {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden space-y-4 pt-1"
+            className="space-y-4 pt-1 pb-3 px-1"
           >
             {/* Search Input */}
             <div className="relative">
@@ -491,7 +491,7 @@ export const Buckets = () => {
                 placeholder="Search food, rent, university, leisure..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="w-full bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-400"
               />
             </div>
 
@@ -583,18 +583,18 @@ export const Buckets = () => {
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     onSubmit={handleCustomSubmit}
-                    className="pt-3 flex flex-col sm:flex-row gap-2.5"
+                    className="pt-3 pb-2 px-1 flex flex-col sm:flex-row gap-2.5"
                   >
                     <input
                       type="text"
                       placeholder="Envelope name (e.g. Pet Care, Gaming)"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="flex-1 min-w-0 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      className="flex-1 min-w-0 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-400"
                     />
 
                     <div className="flex gap-2 w-full sm:w-auto">
-                      <div className="flex items-center bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 focus-within:ring-2 focus-within:ring-indigo-400 flex-1 sm:w-32 sm:flex-none">
+                      <div className="flex items-center bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 focus-within:ring-2 focus-within:ring-indigo-400/40 focus-within:border-indigo-400 flex-1 sm:w-32 sm:flex-none">
                         <span className="text-xs text-gray-400 font-semibold select-none mr-1.5 shrink-0">
                           {sym.trim()}
                         </span>

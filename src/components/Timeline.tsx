@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Filter,
 } from "lucide-react";
+import { Select } from "./ui/Select";
 
 export const Timeline = () => {
   const {
@@ -220,19 +221,21 @@ export const Timeline = () => {
           />
         </div>
 
-        <select
+        <Select
+          size="sm"
+          className="w-48 shrink-0"
           value={filterBucket}
-          onChange={(e) => setFilterBucket(e.target.value)}
-          className="bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        >
-          <option value="all">All Categories</option>
-          <option value="income">Only Income</option>
-          {buckets.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+          onChange={setFilterBucket}
+          options={[
+            { value: "all", label: "All Categories" },
+            { value: "income", label: "Only Income" },
+            ...buckets.map((b) => ({
+              value: b.id,
+              label: b.name,
+            })),
+          ]}
+          placeholder="All Categories"
+        />
       </div>
 
       {/* Transaction List */}

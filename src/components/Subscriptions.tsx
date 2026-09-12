@@ -449,7 +449,7 @@ export const Subscriptions = () => {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden space-y-4 pt-1"
+            className="space-y-4 pt-1 pb-3 px-1"
           >
             {/* Filter pills & Search */}
             <div className="space-y-2.5">
@@ -463,7 +463,7 @@ export const Subscriptions = () => {
                   placeholder="Search AI, Spotify, Netflix, Phone bills..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  className="w-full bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400/40 focus:border-purple-400"
                 />
               </div>
 
@@ -572,7 +572,7 @@ export const Subscriptions = () => {
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     onSubmit={handleCustomSubmit}
-                    className="pt-3 flex flex-col sm:flex-row gap-2.5"
+                    className="pt-3 pb-2 px-1 flex flex-col sm:flex-row gap-2.5"
                   >
                     <div className="flex items-center gap-2">
                       <EmojiPicker value={icon} onChange={setIcon} />
@@ -581,7 +581,7 @@ export const Subscriptions = () => {
                         placeholder="Service name (e.g. Gym, Electricity)"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="flex-1 min-w-0 sm:w-48 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        className="flex-1 min-w-0 sm:w-48 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-3.5 py-2.5 text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400/40 focus:border-purple-400"
                       />
                     </div>
 
