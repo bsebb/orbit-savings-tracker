@@ -13,7 +13,7 @@ export type Currency = "USD" | "EUR" | "MDL";
 export const currencySymbols: Record<Currency, string> = {
   USD: "$",
   EUR: "€",
-  MDL: "M",
+  MDL: "MDL ",
 };
 
 export const RATES_TO_USD: Record<Currency, number> = {

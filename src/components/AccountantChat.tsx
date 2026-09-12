@@ -87,7 +87,7 @@ export const AccountantChat = () => {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 280, damping: 24 }}
-      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto flex flex-col h-[650px]"
+      className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-4 sm:p-6 w-full max-w-2xl mx-auto flex flex-col h-[580px] sm:h-[650px] overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-700/50">
