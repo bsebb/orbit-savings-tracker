@@ -1,5 +1,12 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
+import { fetchCloudUserData, syncCloudUserData } from "../utils/api";
 
 export type Currency = "USD" | "EUR" | "MDL";
 
@@ -124,6 +131,9 @@ type FinanceContextType = {
   rememberDevice: boolean;
   login: (email: string, remember?: boolean) => void;
   logout: () => void;
+  cloudSyncStatus: "synced" | "syncing" | "offline";
+  lastSyncedAt: string | null;
+  syncToCloudNow: () => Promise<void>;
   exportBackupJSON: () => string;
   importBackupJSON: (jsonStr: string) => boolean;
   resetAllData: () => void;
@@ -205,6 +215,90 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setUserEmail(null);
     localStorage.removeItem("orbit_v6_user_email");
     sessionStorage.removeItem("orbit_v6_session_email");
+  };
+
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<
+    "synced" | "syncing" | "offline"
+  >("synced");
+  const [lastSyncedAt, setLastSyncedAt] = useLocalStorage<string | null>(
+    "orbit_v6_last_synced",
+    null,
+  );
+
+  // 1. On login: hydrate state from Upstash Redis
+  useEffect(() => {
+    if (!userEmail) return;
+    fetchCloudUserData(userEmail).then((cloudData) => {
+      if (cloudData) {
+        if (cloudData.currency) _setCurrency(cloudData.currency);
+        if (typeof cloudData.monthlyIncome === "number")
+          setMonthlyIncome(cloudData.monthlyIncome);
+        if (Array.isArray(cloudData.buckets) && cloudData.buckets.length > 0)
+          setBuckets(cloudData.buckets);
+        if (Array.isArray(cloudData.subscriptions))
+          setSubscriptions(cloudData.subscriptions);
+        if (Array.isArray(cloudData.transactions))
+          setTransactions(cloudData.transactions);
+        if (Array.isArray(cloudData.milestones))
+          setMilestones(cloudData.milestones);
+        if (cloudData.lastSyncedAt) setLastSyncedAt(cloudData.lastSyncedAt);
+      }
+    });
+  }, [userEmail]);
+
+  // 2. Debounced auto-sync to Upstash Redis
+  useEffect(() => {
+    if (!userEmail) return;
+    setCloudSyncStatus("syncing");
+    const timer = setTimeout(async () => {
+      const now = new Date().toISOString();
+      const ok = await syncCloudUserData(userEmail, {
+        currency,
+        monthlyIncome,
+        buckets,
+        subscriptions,
+        transactions,
+        milestones,
+        lastSyncedAt: now,
+      });
+      if (ok) {
+        setCloudSyncStatus("synced");
+        setLastSyncedAt(now);
+      } else {
+        setCloudSyncStatus("offline");
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [
+    userEmail,
+    currency,
+    monthlyIncome,
+    buckets,
+    subscriptions,
+    transactions,
+    milestones,
+  ]);
+
+  const syncToCloudNow = async () => {
+    if (!userEmail) return;
+    setCloudSyncStatus("syncing");
+    const now = new Date().toISOString();
+    const ok = await syncCloudUserData(userEmail, {
+      currency,
+      monthlyIncome,
+      buckets,
+      subscriptions,
+      transactions,
+      milestones,
+      lastSyncedAt: now,
+    });
+    if (ok) {
+      setCloudSyncStatus("synced");
+      setLastSyncedAt(now);
+    } else {
+      setCloudSyncStatus("offline");
+    }
   };
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
@@ -407,6 +501,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         rememberDevice,
         login,
         logout,
+        cloudSyncStatus,
+        lastSyncedAt,
+        syncToCloudNow,
         exportBackupJSON,
         importBackupJSON,
         resetAllData,

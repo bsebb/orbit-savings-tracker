@@ -13,7 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // Initialize Upstash Redis or In-Memory fallback
 let redis = null;
@@ -25,7 +25,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
-    console.log('✅ Connected to Upstash Redis');
+    console.log('✅ Connected to Upstash Redis for Cross-Device Sync & OTP');
   } catch (err) {
     console.warn('⚠️ Upstash Redis init error, using in-memory store:', err.message);
   }
@@ -33,7 +33,8 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
   console.log('ℹ️ No Upstash Redis credentials found. Using local in-memory store.');
 }
 
-// Storage helpers
+// ─── Storage Helpers ──────────────────────────────────────────────────────────
+
 async function setOtp(email, code, ttlSeconds = 600) {
   if (redis) {
     await redis.set(`otp:${email}`, code, { ex: ttlSeconds });
@@ -67,11 +68,10 @@ async function deleteOtp(email) {
   }
 }
 
-// ─── Endpoints ─────────────────────────────────────────────────────────────
+// ─── API Endpoints ────────────────────────────────────────────────────────────
 
 /**
  * Health check endpoint for UptimeRobot monitoring
- * Ping every 5 minutes to prevent Render free-tier instance cold sleep
  */
 app.get('/api/health', (req, res) => {
   res.json({
@@ -96,19 +96,27 @@ app.post('/api/auth/send-code', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Save with 10-minute (600s) TTL in Upstash Redis
+    // Store in Redis with 10-minute expiry
     await setOtp(cleanEmail, code, 600);
 
-    // Send real email via Resend or local simulator
+    // Send email
     const result = await sendOtpEmail(cleanEmail, code);
 
-    res.json({
-      success: true,
-      message: 'Verification code sent',
-      provider: result.provider,
-      // Provide devCode for instant local testing when Resend API key is not configured
-      devCode: result.provider === 'local-preview' ? code : undefined,
-    });
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Verification code sent to your email inbox',
+        provider: result.provider,
+        devCode: result.provider === 'local-preview' ? code : undefined,
+      });
+    } else {
+      // Return helpful error so user knows why email failed and provide emergency fallback code
+      res.json({
+        success: false,
+        message: result.error,
+        devCode: result.code,
+      });
+    }
   } catch (err) {
     console.error('Send code error:', err);
     res.status(500).json({ success: false, message: 'Failed to send verification code' });
@@ -142,7 +150,6 @@ app.post('/api/auth/verify-code', async (req, res) => {
       });
     }
 
-    // Code verified — delete to prevent replay attacks
     await deleteOtp(cleanEmail);
 
     res.json({
@@ -153,6 +160,63 @@ app.post('/api/auth/verify-code', async (req, res) => {
   } catch (err) {
     console.error('Verify code error:', err);
     res.status(500).json({ success: false, message: 'Verification error' });
+  }
+});
+
+// ─── Cross-Device Cloud Sync Endpoints ────────────────────────────────────────
+
+/**
+ * Fetch user data from Upstash Redis (Phone / Browser Sync)
+ */
+app.get('/api/user/data', async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    let data = null;
+
+    if (redis) {
+      const stored = await redis.get(`data:${cleanEmail}`);
+      data = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    } else {
+      data = memoryStore.get(`data:${cleanEmail}`) || null;
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Fetch cloud data error:', err);
+    res.status(500).json({ success: false, message: 'Failed to retrieve cloud data' });
+  }
+});
+
+/**
+ * Sync user data to Upstash Redis
+ */
+app.post('/api/user/sync', async (req, res) => {
+  try {
+    const { email, data } = req.body;
+    if (!email || !data) {
+      return res.status(400).json({ success: false, message: 'Email and data required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const payload = typeof data === 'string' ? data : JSON.stringify(data);
+
+    if (redis) {
+      await redis.set(`data:${cleanEmail}`, payload);
+    } else {
+      memoryStore.set(`data:${cleanEmail}`, typeof data === 'string' ? JSON.parse(data) : data);
+    }
+
+    res.json({
+      success: true,
+      message: 'Cloud data synchronized',
+      syncedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Sync cloud data error:', err);
+    res.status(500).json({ success: false, message: 'Failed to sync cloud data' });
   }
 });
 

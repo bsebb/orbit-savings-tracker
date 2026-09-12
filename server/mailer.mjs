@@ -1,9 +1,26 @@
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'Orbit <onboarding@resend.dev>';
 
+// Resend client
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+// SMTP / Gmail client
+let smtpTransporter = null;
+if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  smtpTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT) || 465,
+    secure: (process.env.SMTP_SECURE !== 'false'),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+  console.log('✅ Configured SMTP / Gmail email transporter');
+}
 
 /**
  * Generate Apple-styled HTML email for Orbit OTP verification code
@@ -44,9 +61,28 @@ function buildEmailHtml(code, email) {
 }
 
 /**
- * Send real OTP verification code via Resend or log fallback
+ * Send real OTP verification code via SMTP, Resend, or local fallback
  */
 export async function sendOtpEmail(toEmail, code) {
+  // Option 1: Standard SMTP / Gmail (Sends to ANY email without domain verification)
+  if (smtpTransporter) {
+    try {
+      const info = await smtpTransporter.sendMail({
+        from: process.env.SMTP_FROM || `Orbit <${process.env.SMTP_USER}>`,
+        to: toEmail,
+        subject: `Your Orbit Verification Code: ${code}`,
+        html: buildEmailHtml(code, toEmail),
+        text: `Your Orbit verification code is: ${code}. Valid for 10 minutes.`,
+      });
+      console.log(`✅ Email sent via SMTP to ${toEmail} (ID: ${info.messageId})`);
+      return { success: true, provider: 'smtp', id: info.messageId };
+    } catch (err) {
+      console.error('SMTP delivery failed:', err.message);
+      return { success: false, error: `SMTP error: ${err.message}`, code };
+    }
+  }
+
+  // Option 2: Resend
   if (resend) {
     try {
       const response = await resend.emails.send({
@@ -56,19 +92,34 @@ export async function sendOtpEmail(toEmail, code) {
         html: buildEmailHtml(code, toEmail),
         text: `Your Orbit verification code is: ${code}. Valid for 10 minutes.`,
       });
-      return { success: true, provider: 'resend', id: response.id };
+
+      if (response.error) {
+        console.error('Resend API error:', response.error);
+        return {
+          success: false,
+          error: response.error.message || 'Resend error (Note: onboarding@resend.dev only sends to your registered Resend email address).',
+          code,
+        };
+      }
+
+      console.log(`✅ Email sent via Resend to ${toEmail} (ID: ${response.data?.id})`);
+      return { success: true, provider: 'resend', id: response.data?.id };
     } catch (err) {
-      console.error('Resend delivery failed:', err);
-      // Fall through to simulated success
+      console.error('Resend delivery exception:', err.message);
+      return {
+        success: false,
+        error: `Resend error: ${err.message}. (Before domain verification, Resend only allows sending to your own Resend account email).`,
+        code,
+      };
     }
   }
 
-  // Fallback / local developer preview when RESEND_API_KEY is not yet supplied
+  // Option 3: Local Developer Preview (When neither Resend nor SMTP is configured)
   console.log(`\n======================================================`);
   console.log(`📬 [ORBIT AUTH EMAIL SIMULATOR]`);
   console.log(`To:      ${toEmail}`);
   console.log(`Code:    ${code} (Valid for 10 minutes)`);
-  console.log(`Status:  Set RESEND_API_KEY in .env to dispatch live emails`);
+  console.log(`Tip:     Set SMTP_USER/SMTP_PASS (Gmail) or RESEND_API_KEY in Render to send live emails`);
   console.log(`======================================================\n`);
 
   return { success: true, provider: 'local-preview', code };

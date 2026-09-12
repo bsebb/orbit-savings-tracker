@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   LogOut,
   User,
+  Cloud,
+  RefreshCw,
 } from "lucide-react";
 
 const CURRENCIES: Currency[] = ["USD", "EUR", "MDL"];
@@ -32,6 +34,9 @@ export const Settings = () => {
     userEmail,
     rememberDevice,
     logout,
+    cloudSyncStatus,
+    lastSyncedAt,
+    syncToCloudNow,
   } = useFinance();
 
   const sym = currencySymbols[currency];
@@ -96,45 +101,89 @@ export const Settings = () => {
           Data Safety
         </h2>
         <span className="text-xs px-2.5 py-1 bg-green-500/10 text-green-600 dark:text-green-400 font-semibold rounded-full flex items-center gap-1 border border-green-500/20">
-          <ShieldCheck size={12} /> Local-First Storage
+          <ShieldCheck size={12} /> Local & Cloud Synced
         </span>
       </div>
 
       <div className="space-y-5">
-        {/* Account Profile Section */}
-        <div className="p-4 bg-white/70 dark:bg-gray-900/70 rounded-2xl border border-white/40 dark:border-gray-700/40 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-indigo-500/20">
-              {userEmail ? userEmail.slice(0, 2).toUpperCase() : "U"}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                  {userEmail}
-                </p>
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${rememberDevice ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
-                >
-                  {rememberDevice ? "Trusted Device" : "Session Only"}
-                </span>
+        {/* Account Profile & Cloud Sync Section */}
+        <div className="p-4 bg-white/70 dark:bg-gray-900/70 rounded-2xl border border-white/40 dark:border-gray-700/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-indigo-500/20">
+                {userEmail ? userEmail.slice(0, 2).toUpperCase() : "U"}
               </div>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {rememberDevice
-                  ? "Persistent 4-year login active"
-                  : "Session clears on tab close"}
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                    {userEmail}
+                  </p>
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${rememberDevice ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
+                  >
+                    {rememberDevice ? "Trusted Device" : "Session Only"}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {rememberDevice
+                    ? "Persistent 4-year login active"
+                    : "Session clears on tab close"}
+                </p>
+              </div>
             </div>
+
+            <button
+              onClick={() => {
+                logout();
+                toast.success("Signed out successfully");
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+            >
+              <LogOut size={13} /> Sign Out
+            </button>
           </div>
 
-          <button
-            onClick={() => {
-              logout();
-              toast.success("Signed out successfully");
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-          >
-            <LogOut size={13} /> Sign Out
-          </button>
+          <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Cloud
+                size={15}
+                className={
+                  cloudSyncStatus === "syncing"
+                    ? "text-amber-500 animate-spin"
+                    : cloudSyncStatus === "synced"
+                      ? "text-emerald-500"
+                      : "text-rose-500"
+                }
+              />
+              <div className="text-xs">
+                <span className="font-semibold text-gray-700 dark:text-gray-300">
+                  {cloudSyncStatus === "synced" &&
+                    "Cloud Sync: Synced across devices"}
+                  {cloudSyncStatus === "syncing" && "Cloud Sync: Syncing..."}
+                  {cloudSyncStatus === "offline" && "Cloud Sync: Offline"}
+                </span>
+                {lastSyncedAt && (
+                  <span className="text-[10px] text-gray-400 ml-2">
+                    Updated {new Date(lastSyncedAt).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                await syncToCloudNow();
+                toast.success("Synchronized with cloud");
+              }}
+              disabled={cloudSyncStatus === "syncing"}
+              className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw
+                size={12}
+                className={cloudSyncStatus === "syncing" ? "animate-spin" : ""}
+              />
+              Sync Now
+            </button>
+          </div>
         </div>
 
         {/* Currency Switcher */}

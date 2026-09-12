@@ -22,12 +22,12 @@ export async function sendLoginCode(email: string): Promise<{
 
     const data = await res.json();
     return data;
-  } catch (err) {
+  } catch {
     // If backend is unreachable (e.g. static Vite preview), fallback to client code
     const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
     return {
       success: true,
-      message: "Code generated",
+      message: "Code generated locally (offline mode)",
       provider: "client-offline",
       devCode: fallbackCode,
     };
@@ -51,11 +51,46 @@ export async function verifyLoginCode(
 
     const data = await res.json();
     return data;
-  } catch (err) {
+  } catch {
     return {
       success: false,
       message: "Could not connect to authentication server",
     };
+  }
+}
+
+/**
+ * Fetch synchronized cloud data from Upstash Redis
+ */
+export async function fetchCloudUserData(email: string): Promise<any | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/user/data?email=${encodeURIComponent(email)}`,
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sync user financial profile to Upstash Redis for multi-device access
+ */
+export async function syncCloudUserData(
+  email: string,
+  data: any,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/user/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, data }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
