@@ -7,6 +7,14 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'Orbit <onboarding@resend.dev>';
 // Resend client
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
+// Brevo HTTP API client (communicates over HTTPS Port 443 — sends to ANY email without domain verification)
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || 'orbit.auth.team@gmail.com';
+const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'Orbit';
+if (BREVO_API_KEY) {
+  console.log('✅ Configured Brevo HTTPS email API (Port 443 - universal delivery)');
+}
+
 // SMTP / Gmail client
 let smtpTransporter = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -94,7 +102,41 @@ function buildEmailHtml(code, email) {
  * Send real OTP verification code via SMTP, Resend, or local fallback
  */
 export async function sendOtpEmail(toEmail, code) {
-  // Option 1: Standard SMTP / Gmail (Sends to ANY email without domain verification)
+  // Option 1: Brevo HTTP API (Sends to ANY email worldwide over HTTPS Port 443 — zero firewall blocks)
+  if (BREVO_API_KEY) {
+    try {
+      console.log(`📤 Sending OTP verification code via Brevo HTTPS API to ${toEmail}...`);
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': BREVO_API_KEY,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
+          to: [{ email: toEmail }],
+          subject: `Your Orbit Verification Code: ${code}`,
+          htmlContent: buildEmailHtml(code, toEmail),
+          textContent: `Your Orbit verification code is: ${code}. Valid for 10 minutes.`,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('❌ Brevo API error:', data);
+        return { success: false, error: data.message || 'Brevo delivery failed', code };
+      }
+
+      console.log(`✅ Email sent via Brevo to ${toEmail} (ID: ${data.messageId})`);
+      return { success: true, provider: 'brevo', id: data.messageId };
+    } catch (err) {
+      console.error('❌ Brevo delivery exception:', err.message);
+      return { success: false, error: `Brevo error: ${err.message}`, code };
+    }
+  }
+
+  // Option 2: Standard SMTP / Gmail (Sends to ANY email without domain verification)
   if (smtpTransporter) {
     try {
       const cleanUser = process.env.SMTP_USER.trim();
