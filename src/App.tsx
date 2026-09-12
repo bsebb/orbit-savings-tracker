@@ -68,7 +68,7 @@ function AppInner() {
         }}
       />
 
-      <div className="max-w-2xl mx-auto pb-24">
+      <div className="max-w-2xl mx-auto pb-24 px-3 sm:px-4">
         {!userEmail ? (
           <>
             <header className="flex items-center justify-end pt-4 pb-2 px-2">
