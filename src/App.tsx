@@ -7,6 +7,7 @@ import { Settings } from "./components/Settings";
 import { AccountantChat } from "./components/AccountantChat";
 import { Buckets } from "./components/Buckets";
 import { Projection } from "./components/Projection";
+import { Subscriptions } from "./components/Subscriptions";
 import { Moon, Sun } from "lucide-react";
 
 const ThemeToggle = () => {
@@ -29,7 +30,6 @@ function AppInner() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4 sm:p-8 relative">
       <ThemeToggle />
 
-      {/* Sonner toaster — theme-aware */}
       <Toaster
         position="top-center"
         theme={theme === "dark" ? "dark" : "light"}
@@ -55,6 +55,7 @@ function AppInner() {
         <Settings />
         <Dashboard />
         <Buckets />
+        <Subscriptions />
         <Projection />
         <Ledger />
         <AccountantChat />

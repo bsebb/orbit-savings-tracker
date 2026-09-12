@@ -9,11 +9,10 @@ export const currencySymbols: Record<Currency, string> = {
   MDL: "M",
 };
 
-// USD-based exchange rates (approximate, hardcoded for local-first app)
 const RATES_TO_USD: Record<Currency, number> = {
   USD: 1,
-  EUR: 1 / 0.92, // 1 EUR ≈ 1.087 USD
-  MDL: 1 / 17.8, // 1 MDL ≈ 0.0562 USD
+  EUR: 1 / 0.92,
+  MDL: 1 / 17.8,
 };
 
 export type Bucket = {
@@ -22,9 +21,16 @@ export type Bucket = {
   allocated: number;
 };
 
+export type Subscription = {
+  id: string;
+  name: string;
+  amount: number;
+  icon: string;
+};
+
 export type Transaction = {
   id: string;
-  bucketId: string | null; // null = one-off income
+  bucketId: string | null;
   amount: number;
   type: "expense" | "income";
   date: string;
@@ -32,9 +38,9 @@ export type Transaction = {
 };
 
 const DEFAULT_BUCKETS: Bucket[] = [
-  { id: "default-housing", name: "Housing", allocated: 0 },
-  { id: "default-groceries", name: "Groceries", allocated: 0 },
-  { id: "default-utilities", name: "Utilities", allocated: 0 },
+  { id: "default-food", name: "Food", allocated: 0 },
+  { id: "default-transport", name: "Transport", allocated: 0 },
+  { id: "default-university", name: "University", allocated: 0 },
   { id: "default-fun", name: "Fun", allocated: 0 },
 ];
 
@@ -47,6 +53,10 @@ type FinanceContextType = {
   addBucket: (b: Omit<Bucket, "id">) => void;
   removeBucket: (id: string) => void;
   updateBucket: (id: string, data: Partial<Omit<Bucket, "id">>) => void;
+  subscriptions: Subscription[];
+  addSubscription: (s: Omit<Subscription, "id">) => void;
+  removeSubscription: (id: string) => void;
+  totalSubscriptions: number;
   transactions: Transaction[];
   addTransaction: (t: Omit<Transaction, "id" | "date">) => void;
   geminiKey: string;
@@ -71,6 +81,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     "orbit_v5_buckets",
     DEFAULT_BUCKETS,
   );
+  const [subscriptions, setSubscriptions] = useLocalStorage<Subscription[]>(
+    "orbit_v5_subs",
+    [],
+  );
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
     "orbit_v5_transactions",
     [],
@@ -81,11 +95,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   );
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
+  const totalSubscriptions = subscriptions.reduce(
+    (sum, s) => sum + s.amount,
+    0,
+  );
   const oneOffIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
   const guaranteedSavings =
-    Math.max(0, monthlyIncome - totalAllocated) + oneOffIncome;
+    Math.max(0, monthlyIncome - totalAllocated - totalSubscriptions) +
+    oneOffIncome;
 
   const getBucketSpent = (bucketId: string) => {
     const currentMonth = new Date().getMonth();
@@ -99,34 +118,36 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  const addBucket = (b: Omit<Bucket, "id">) => {
+  const addBucket = (b: Omit<Bucket, "id">) =>
     setBuckets([...buckets, { ...b, id: crypto.randomUUID() }]);
-  };
-
   const removeBucket = (id: string) => {
     setBuckets(buckets.filter((b) => b.id !== id));
     setTransactions(transactions.filter((t) => t.bucketId !== id));
   };
-
-  const updateBucket = (id: string, data: Partial<Omit<Bucket, "id">>) => {
+  const updateBucket = (id: string, data: Partial<Omit<Bucket, "id">>) =>
     setBuckets(buckets.map((b) => (b.id === id ? { ...b, ...data } : b)));
-  };
 
-  const addTransaction = (t: Omit<Transaction, "id" | "date">) => {
+  const addSubscription = (s: Omit<Subscription, "id">) =>
+    setSubscriptions([...subscriptions, { ...s, id: crypto.randomUUID() }]);
+  const removeSubscription = (id: string) =>
+    setSubscriptions(subscriptions.filter((s) => s.id !== id));
+
+  const addTransaction = (t: Omit<Transaction, "id" | "date">) =>
     setTransactions([
       { ...t, id: crypto.randomUUID(), date: new Date().toISOString() },
       ...transactions,
     ]);
-  };
 
-  // Convert all stored monetary values when switching currency
   const setCurrency = (newCurrency: Currency) => {
     if (newCurrency === currency) return;
     const factor = RATES_TO_USD[currency] / RATES_TO_USD[newCurrency];
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    setMonthlyIncome(round2(monthlyIncome * factor));
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    setMonthlyIncome(r2(monthlyIncome * factor));
     setBuckets(
-      buckets.map((b) => ({ ...b, allocated: round2(b.allocated * factor) })),
+      buckets.map((b) => ({ ...b, allocated: r2(b.allocated * factor) })),
+    );
+    setSubscriptions(
+      subscriptions.map((s) => ({ ...s, amount: r2(s.amount * factor) })),
     );
     _setCurrency(newCurrency);
   };
@@ -142,6 +163,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         addBucket,
         removeBucket,
         updateBucket,
+        subscriptions,
+        addSubscription,
+        removeSubscription,
+        totalSubscriptions,
         transactions,
         addTransaction,
         geminiKey,
@@ -157,8 +182,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 }
 
 export function useFinance() {
-  const context = useContext(FinanceContext);
-  if (context === undefined)
-    throw new Error("useFinance must be used within a FinanceProvider");
-  return context;
+  const ctx = useContext(FinanceContext);
+  if (!ctx) throw new Error("useFinance must be used within a FinanceProvider");
+  return ctx;
 }

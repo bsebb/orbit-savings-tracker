@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useFinance, currencySymbols } from "../context/FinanceContext";
+import { Select } from "./ui/Select";
 import { ArrowDownLeft, ArrowUpRight, Minus, Plus } from "lucide-react";
 
 export const Ledger = () => {
@@ -11,6 +12,8 @@ export const Ledger = () => {
   const [amount, setAmount] = useState("");
   const [bucketId, setBucketId] = useState("");
   const [note, setNote] = useState("");
+
+  const bucketOptions = buckets.map((b) => ({ value: b.id, label: b.name }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +43,6 @@ export const Ledger = () => {
       transition={{ type: "spring", stiffness: 260, damping: 24, delay: 0.2 }}
       className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto"
     >
-      {/* Header + type toggle */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           Transactions
@@ -66,21 +68,13 @@ export const Ledger = () => {
 
       <form onSubmit={handleSubmit} className="flex gap-3 mb-6 flex-wrap">
         {type === "expense" && (
-          <select
+          <Select
+            options={bucketOptions}
             value={bucketId}
-            onChange={(e) => setBucketId(e.target.value)}
-            required
-            className="flex-1 min-w-[140px] bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          >
-            <option value="" disabled className="dark:bg-gray-800">
-              Select bucket
-            </option>
-            {buckets.map((b) => (
-              <option key={b.id} value={b.id} className="dark:bg-gray-800">
-                {b.name}
-              </option>
-            ))}
-          </select>
+            onChange={setBucketId}
+            placeholder="Select bucket"
+            className="flex-1 min-w-[160px]"
+          />
         )}
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
@@ -110,7 +104,6 @@ export const Ledger = () => {
         </button>
       </form>
 
-      {/* Transaction list */}
       <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
         <AnimatePresence>
           {transactions.length === 0 ? (

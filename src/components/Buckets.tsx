@@ -4,6 +4,16 @@ import { toast } from "sonner";
 import { useFinance, currencySymbols } from "../context/FinanceContext";
 import { LayoutGrid, Trash2, Pencil, Check } from "lucide-react";
 
+const PRESETS = [
+  { emoji: "🍔", name: "Food" },
+  { emoji: "🚌", name: "Transport" },
+  { emoji: "🎓", name: "University" },
+  { emoji: "🏠", name: "Housing" },
+  { emoji: "🎉", name: "Fun" },
+  { emoji: "👕", name: "Clothing" },
+  { emoji: "💊", name: "Health" },
+];
+
 export const Buckets = () => {
   const {
     buckets,
@@ -19,6 +29,8 @@ export const Buckets = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
 
+  const existingNames = new Set(buckets.map((b) => b.name.toLowerCase()));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !allocated) return;
@@ -26,6 +38,11 @@ export const Buckets = () => {
     toast.success(`Bucket "${name.trim()}" created`);
     setName("");
     setAllocated("");
+  };
+
+  const handlePreset = (presetName: string) => {
+    addBucket({ name: presetName, allocated: 0 });
+    toast.success(`${presetName} bucket added`);
   };
 
   const handleEditSave = (id: string, currentName: string) => {
@@ -38,6 +55,10 @@ export const Buckets = () => {
     setEditVal("");
   };
 
+  const availablePresets = PRESETS.filter(
+    (p) => !existingNames.has(p.name.toLowerCase()),
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -45,14 +66,32 @@ export const Buckets = () => {
       transition={{ type: "spring", stiffness: 260, damping: 24, delay: 0.1 }}
       className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto"
     >
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-5 flex items-center gap-2">
         <LayoutGrid size={20} className="text-indigo-500" /> Expense Buckets
       </h2>
 
+      {/* Preset chips */}
+      {availablePresets.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {availablePresets.map((p) => (
+            <button
+              key={p.name}
+              type="button"
+              onClick={() => handlePreset(p.name)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/70 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95"
+            >
+              <span>{p.emoji}</span>
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Custom bucket form */}
       <form onSubmit={handleSubmit} className="flex gap-3 mb-6">
         <input
           type="text"
-          placeholder="Bucket name"
+          placeholder="Custom bucket name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="flex-1 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -96,7 +135,6 @@ export const Buckets = () => {
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 className="relative p-5 bg-white/70 dark:bg-gray-900/60 rounded-2xl border border-white/40 dark:border-gray-700/40 shadow-sm overflow-hidden group"
               >
-                {/* Progress fill */}
                 <motion.div
                   className={`absolute inset-y-0 left-0 -z-10 ${isOver ? "bg-red-100 dark:bg-red-900/20" : "bg-indigo-100/70 dark:bg-indigo-900/20"}`}
                   initial={{ width: 0 }}
@@ -115,7 +153,7 @@ export const Buckets = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1 ml-2">
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
                     {editingId === b.id ? (
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-gray-400">{sym}</span>
@@ -167,7 +205,7 @@ export const Buckets = () => {
                     {b.allocated.toLocaleString()} budget
                   </span>
                   <span
-                    className={`text-lg font-bold ${isOver ? "text-red-500 dark:text-red-400" : remaining === 0 ? "text-gray-400" : "text-indigo-600 dark:text-indigo-400"}`}
+                    className={`text-lg font-bold ${isOver ? "text-red-500 dark:text-red-400" : remaining === 0 && b.allocated === 0 ? "text-gray-400" : remaining === 0 ? "text-gray-400" : "text-indigo-600 dark:text-indigo-400"}`}
                   >
                     {isOver ? "-" : ""}
                     {sym}
