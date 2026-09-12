@@ -25,7 +25,7 @@ export async function askAccountant(
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.7-flash",
       contents: [
         { role: "user", parts: [{ text: context }] },
         { role: "user", parts: [{ text: prompt }] },

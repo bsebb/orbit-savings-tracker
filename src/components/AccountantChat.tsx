@@ -4,7 +4,7 @@ import { askAccountant } from "../utils/gemini";
 import { Bot, Send, Key } from "lucide-react";
 
 export const AccountantChat = () => {
-  const { balance, transactions, goals, geminiKey, setGeminiKey } =
+  const { balance, transactions, goals, categories, geminiKey, setGeminiKey } =
     useFinance();
   const [messages, setMessages] = useState<
     { role: "user" | "ai"; text: string }[]
@@ -34,26 +34,26 @@ export const AccountantChat = () => {
   };
 
   return (
-    <div className="bg-white/40 backdrop-blur-xl border border-white/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto my-8 flex flex-col h-[500px]">
-      <div className="flex items-center justify-between mb-6 border-b border-gray-200 pb-4">
-        <h2 className="text-2xl font-semibold text-gray-900 flex items-center gap-2">
+    <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-xl border border-white/50 dark:border-gray-700/50 shadow-xl rounded-3xl p-6 w-full max-w-2xl mx-auto my-8 flex flex-col h-[500px]">
+      <div className="flex items-center justify-between mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
+        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <Bot className="text-blue-500" /> AI Accountant
         </h2>
         <div className="flex items-center gap-2">
-          <Key size={16} className="text-gray-400" />
+          <Key size={16} className="text-gray-400 dark:text-gray-500" />
           <input
             type="password"
             placeholder="Gemini API Key"
             value={geminiKey}
             onChange={(e) => setGeminiKey(e.target.value)}
-            className="text-sm bg-white/60 border border-white/50 rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="text-sm bg-white/60 dark:bg-gray-900/60 dark:text-gray-100 border border-white/50 dark:border-gray-700/50 rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
           />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
+          <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 space-y-2">
             <Bot size={48} className="opacity-20" />
             <p>Ask me if you can afford your next purchase.</p>
           </div>
@@ -64,7 +64,7 @@ export const AccountantChat = () => {
               className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-5 py-3 ${m.role === "user" ? "bg-blue-600 text-white" : "bg-white/80 text-gray-900 shadow-sm border border-white/40"}`}
+                className={`max-w-[80%] rounded-2xl px-5 py-3 ${m.role === "user" ? "bg-blue-600 text-white" : "bg-white/80 dark:bg-gray-900/80 text-gray-900 dark:text-gray-100 shadow-sm border border-white/40 dark:border-gray-700/40"}`}
               >
                 {m.text}
               </div>
@@ -73,7 +73,7 @@ export const AccountantChat = () => {
         )}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white/80 text-gray-400 shadow-sm border border-white/40 rounded-2xl px-5 py-3 animate-pulse">
+            <div className="bg-white/80 dark:bg-gray-900/80 text-gray-400 shadow-sm border border-white/40 dark:border-gray-700/40 rounded-2xl px-5 py-3 animate-pulse">
               Thinking...
             </div>
           </div>
@@ -89,7 +89,7 @@ export const AccountantChat = () => {
             geminiKey ? "Ask a financial question..." : "Enter API Key first..."
           }
           disabled={!geminiKey}
-          className="w-full bg-white/70 border border-white/50 rounded-2xl pl-6 pr-14 py-4 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all placeholder-gray-400 disabled:opacity-50"
+          className="w-full bg-white/70 dark:bg-gray-900/70 border border-white/50 dark:border-gray-700/50 rounded-2xl pl-6 pr-14 py-4 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-50"
         />
         <button
           type="submit"

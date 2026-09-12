@@ -1,11 +1,17 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
+export type Category = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  type: "income" | "expense";
+};
+
 export type Transaction = {
   id: string;
-  type: "income" | "expense";
+  categoryId: string;
   amount: number;
-  category: string;
   date: string;
   note?: string;
 };
@@ -18,6 +24,8 @@ export type Goal = {
 };
 
 type FinanceContextType = {
+  categories: Category[];
+  addCategory: (c: Omit<Category, "id">) => void;
   transactions: Transaction[];
   addTransaction: (t: Omit<Transaction, "id" | "date">) => void;
   goals: Goal[];
@@ -31,6 +39,10 @@ type FinanceContextType = {
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
+  const [categories, setCategories] = useLocalStorage<Category[]>(
+    "orbit_categories",
+    [],
+  );
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
     "orbit_transactions",
     [],
@@ -41,9 +53,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     "",
   );
 
-  const balance = transactions.reduce((acc, curr) => {
-    return curr.type === "income" ? acc + curr.amount : acc - curr.amount;
+  const balance = transactions.reduce((acc, tx) => {
+    const cat = categories.find((c) => c.id === tx.categoryId);
+    if (!cat) return acc;
+    return cat.type === "income" ? acc + tx.amount : acc - tx.amount;
   }, 0);
+
+  const addCategory = (c: Omit<Category, "id">) => {
+    setCategories([...categories, { ...c, id: crypto.randomUUID() }]);
+  };
 
   const addTransaction = (t: Omit<Transaction, "id" | "date">) => {
     setTransactions([
@@ -67,6 +85,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   return (
     <FinanceContext.Provider
       value={{
+        categories,
+        addCategory,
         transactions,
         addTransaction,
         goals,
