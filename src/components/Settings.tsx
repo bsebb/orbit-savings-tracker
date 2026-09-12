@@ -30,6 +30,7 @@ export const Settings = () => {
     importBackupJSON,
     resetAllData,
     userEmail,
+    rememberDevice,
     logout,
   } = useFinance();
 
@@ -107,11 +108,20 @@ export const Settings = () => {
               {userEmail ? userEmail.slice(0, 2).toUpperCase() : "U"}
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                Signed in as
-              </p>
-              <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                {userEmail}
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                  {userEmail}
+                </p>
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${rememberDevice ? "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/40" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
+                >
+                  {rememberDevice ? "Trusted Device" : "Session Only"}
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {rememberDevice
+                  ? "Persistent 4-year login active"
+                  : "Session clears on tab close"}
               </p>
             </div>
           </div>

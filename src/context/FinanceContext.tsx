@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
 export type Currency = "USD" | "EUR" | "MDL";
@@ -121,7 +121,8 @@ type FinanceContextType = {
   addChatMessage: (msg: Omit<ChatMessage, "timestamp">) => void;
   clearChatHistory: () => void;
   userEmail: string | null;
-  login: (email: string) => void;
+  rememberDevice: boolean;
+  login: (email: string, remember?: boolean) => void;
   logout: () => void;
   exportBackupJSON: () => string;
   importBackupJSON: (jsonStr: string) => boolean;
@@ -168,17 +169,42 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     "orbit_v6_chat_history",
     [],
   );
-  const [userEmail, setUserEmail] = useLocalStorage<string | null>(
-    "orbit_v6_user_email",
-    null,
+  const [rememberDevice, setRememberDevice] = useLocalStorage<boolean>(
+    "orbit_v6_remember_device",
+    true,
   );
+  const [userEmail, setUserEmail] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem("orbit_v6_user_email");
+      if (stored) return JSON.parse(stored);
+      const session = sessionStorage.getItem("orbit_v6_session_email");
+      if (session) return JSON.parse(session);
+      return null;
+    } catch {
+      return null;
+    }
+  });
 
-  const login = (email: string) => {
-    setUserEmail(email.trim().toLowerCase());
+  const login = (email: string, remember: boolean = true) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setRememberDevice(remember);
+    setUserEmail(cleanEmail);
+    if (remember) {
+      localStorage.setItem("orbit_v6_user_email", JSON.stringify(cleanEmail));
+      sessionStorage.removeItem("orbit_v6_session_email");
+    } else {
+      sessionStorage.setItem(
+        "orbit_v6_session_email",
+        JSON.stringify(cleanEmail),
+      );
+      localStorage.removeItem("orbit_v6_user_email");
+    }
   };
 
   const logout = () => {
     setUserEmail(null);
+    localStorage.removeItem("orbit_v6_user_email");
+    sessionStorage.removeItem("orbit_v6_session_email");
   };
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
@@ -378,6 +404,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         addChatMessage,
         clearChatHistory,
         userEmail,
+        rememberDevice,
         login,
         logout,
         exportBackupJSON,
