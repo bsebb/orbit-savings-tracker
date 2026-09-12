@@ -38,7 +38,12 @@ function AppInner() {
   const { theme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 p-4 sm:p-8 relative">
+    <div className="min-h-screen relative p-4 sm:p-8">
+      {/* Light gradient — fades out in dark mode */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-indigo-50/40 to-purple-50 dark:opacity-0 -z-10" />
+      {/* Dark gradient — fades in in dark mode */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 opacity-0 dark:opacity-100 -z-10" />
+
       <ThemeToggle />
 
       <Toaster

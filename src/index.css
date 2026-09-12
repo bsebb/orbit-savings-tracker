@@ -37,7 +37,7 @@
 .theme-transitioning *::before,
 .theme-transitioning *::after {
   transition-property:
-    background-color, border-color, color, fill, stroke !important;
+    background-color, border-color, color, fill, stroke, opacity !important;
   transition-duration: 280ms !important;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
