@@ -22,6 +22,9 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
             user: cleanUser,
             pass: cleanPass,
           },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
         }
       : {
           host: process.env.SMTP_HOST,
@@ -31,6 +34,9 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
             user: cleanUser,
             pass: cleanPass,
           },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
         }
   );
 

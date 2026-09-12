@@ -11,7 +11,6 @@ import {
   KeyRound,
   ChevronLeft,
   Check,
-  Copy,
 } from "lucide-react";
 
 export const AuthScreen = () => {
@@ -19,7 +18,6 @@ export const AuthScreen = () => {
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [remember, setRemember] = useState(true);
-  const [otpCode, setOtpCode] = useState("");
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(30);
@@ -34,26 +32,10 @@ export const AuthScreen = () => {
     try {
       const res = await sendLoginCode(targetEmail);
       if (res.success) {
-        if (res.devCode) {
-          setOtpCode(res.devCode);
-          toast(`📬 Verification code ready for ${targetEmail}`, {
-            description: `Security Code: ${res.devCode} (Valid for 10 minutes)`,
-            duration: 10000,
-            action: {
-              label: "Auto-fill",
-              onClick: () => {
-                setDigits(res.devCode!.split(""));
-                setTimeout(() => handleVerify(res.devCode!), 200);
-              },
-            },
-          });
-        } else {
-          setOtpCode("");
-          toast.success(`Verification code sent to ${targetEmail}`, {
-            description:
-              "Check your inbox (and spam folder) for your 6-digit code.",
-          });
-        }
+        toast.success(`Verification code sent to ${targetEmail}`, {
+          description:
+            "Check your inbox (and spam folder) for your 6-digit code.",
+        });
       } else {
         toast.error(res.message || "Failed to send verification code");
       }
@@ -130,13 +112,6 @@ export const AuthScreen = () => {
   const handleVerify = async (enteredCode: string) => {
     setLoading(true);
     try {
-      if (otpCode && enteredCode === otpCode) {
-        login(email.trim(), remember);
-        toast.success(`Welcome to Orbit, ${email.trim()}!`, { icon: "✨" });
-        setLoading(false);
-        return;
-      }
-
       const res = await verifyLoginCode(email.trim(), enteredCode);
       if (res.success) {
         login(email.trim(), remember);
@@ -245,21 +220,6 @@ export const AuthScreen = () => {
                   )}
                 </button>
               </form>
-
-              {/* Demo Quick login */}
-              <div className="pt-4 border-t border-gray-200/50 dark:border-gray-800/60 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail("bsebb@orbit.app");
-                    setStep("code");
-                    generateAndSendCode("bsebb@orbit.app");
-                  }}
-                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  Or test with demo account: bsebb@orbit.app
-                </button>
-              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -279,26 +239,6 @@ export const AuthScreen = () => {
                   <span className="font-semibold text-indigo-500">{email}</span>
                 </p>
               </div>
-
-              {/* Code Preview Chip */}
-              {otpCode && (
-                <div
-                  onClick={() => {
-                    setDigits(otpCode.split(""));
-                    handleVerify(otpCode);
-                  }}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 rounded-xl text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400 cursor-pointer hover:scale-105 active:scale-95 transition-all"
-                  title="Click to auto-fill code"
-                >
-                  <Copy size={12} />
-                  <span>
-                    Code: {otpCode.slice(0, 3)} {otpCode.slice(3)}
-                  </span>
-                  <span className="text-[10px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-sans">
-                    Tap to paste
-                  </span>
-                </div>
-              )}
 
               {/* 6 Digit Inputs */}
               <div className="flex justify-center gap-2 sm:gap-2.5">

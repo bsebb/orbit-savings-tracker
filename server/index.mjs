@@ -106,16 +106,11 @@ app.post('/api/auth/send-code', async (req, res) => {
       res.json({
         success: true,
         message: 'Verification code sent to your email inbox',
-        provider: result.provider,
-        devCode: result.provider === 'local-preview' ? code : undefined,
       });
     } else {
-      console.warn(`⚠️ Email delivery note for ${cleanEmail}: ${result.error}. Providing direct verification code.`);
-      res.json({
-        success: true,
-        message: 'Resend sandbox active: direct verification code provided.',
-        devCode: code,
-        sandboxNotice: true,
+      res.status(400).json({
+        success: false,
+        message: result.error || 'Failed to send verification code. Please check your email configuration.',
       });
     }
   } catch (err) {
