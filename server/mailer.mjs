@@ -10,16 +10,40 @@ const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 // SMTP / Gmail client
 let smtpTransporter = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  smtpTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: (process.env.SMTP_SECURE !== 'false'),
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+  const cleanPass = process.env.SMTP_PASS.replace(/\s+/g, '').trim();
+  const cleanUser = process.env.SMTP_USER.trim();
+  const isGmail = (process.env.SMTP_HOST || 'smtp.gmail.com').toLowerCase().includes('gmail');
+
+  smtpTransporter = nodemailer.createTransport(
+    isGmail
+      ? {
+          service: 'gmail',
+          auth: {
+            user: cleanUser,
+            pass: cleanPass,
+          },
+        }
+      : {
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT) || 465,
+          secure: process.env.SMTP_SECURE !== 'false',
+          auth: {
+            user: cleanUser,
+            pass: cleanPass,
+          },
+        }
+  );
+
+  console.log(`✅ Configured SMTP email transporter (${isGmail ? 'Gmail Service' : process.env.SMTP_HOST})`);
+
+  // Verify connection configuration on startup
+  smtpTransporter.verify((err) => {
+    if (err) {
+      console.error('❌ SMTP Connection / Authentication error:', err.message);
+    } else {
+      console.log('✅ SMTP / Gmail authentication verified and ready for delivery');
+    }
   });
-  console.log('✅ Configured SMTP / Gmail email transporter');
 }
 
 /**
@@ -67,8 +91,12 @@ export async function sendOtpEmail(toEmail, code) {
   // Option 1: Standard SMTP / Gmail (Sends to ANY email without domain verification)
   if (smtpTransporter) {
     try {
+      const cleanUser = process.env.SMTP_USER.trim();
+      const fromHeader = process.env.SMTP_FROM || `Orbit <${cleanUser}>`;
+      console.log(`📤 Sending OTP verification code via SMTP to ${toEmail} from ${fromHeader}...`);
+
       const info = await smtpTransporter.sendMail({
-        from: process.env.SMTP_FROM || `Orbit <${process.env.SMTP_USER}>`,
+        from: fromHeader,
         to: toEmail,
         subject: `Your Orbit Verification Code: ${code}`,
         html: buildEmailHtml(code, toEmail),
@@ -77,7 +105,7 @@ export async function sendOtpEmail(toEmail, code) {
       console.log(`✅ Email sent via SMTP to ${toEmail} (ID: ${info.messageId})`);
       return { success: true, provider: 'smtp', id: info.messageId };
     } catch (err) {
-      console.error('SMTP delivery failed:', err.message);
+      console.error('❌ SMTP delivery failed:', err.message);
       return { success: false, error: `SMTP error: ${err.message}`, code };
     }
   }
