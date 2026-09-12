@@ -24,7 +24,7 @@ ChartJS.register(
 );
 
 export const Projection = () => {
-  const { monthlyIncome, buckets, currency } = useFinance();
+  const { monthlyIncome, buckets, currency, totalSubscriptions } = useFinance();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const sym = currencySymbols[currency];
@@ -32,7 +32,8 @@ export const Projection = () => {
   const [expenseAdj, setExpenseAdj] = useState(0);
 
   const totalAllocated = buckets.reduce((sum, b) => sum + b.allocated, 0);
-  const adjustedExpenses = totalAllocated * (1 + expenseAdj / 100);
+  const baseExpenses = totalAllocated + totalSubscriptions;
+  const adjustedExpenses = baseExpenses * (1 + expenseAdj / 100);
   const netMonthly = monthlyIncome - adjustedExpenses;
 
   const labels = Array.from({ length: monthsAhead }, (_, i) => `Mo ${i + 1}`);

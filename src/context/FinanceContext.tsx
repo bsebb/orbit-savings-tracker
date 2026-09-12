@@ -95,6 +95,25 @@ export const formatMonthKey = (date: Date = new Date()) => {
   return `${y}-${m}`;
 };
 
+export const safeRandomUUID = (): string => {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // Fallback below
+    }
+  }
+  return (
+    "id-" +
+    Date.now().toString(36) +
+    "-" +
+    Math.random().toString(36).substring(2, 9)
+  );
+};
+
 type FinanceContextType = {
   currency: Currency;
   setCurrency: (c: Currency) => void;
@@ -223,6 +242,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setUserEmail(null);
     localStorage.removeItem("orbit_v6_user_email");
     sessionStorage.removeItem("orbit_v6_session_email");
+    setLastSyncedAt(null);
+    lastSyncedAtRef.current = null;
+    setUndoStack([]);
+    setChatHistory([]);
+    _setCurrency("USD");
+    setMonthlyIncome(3500);
+    setBuckets(DEFAULT_BUCKETS);
+    setSubscriptions([]);
+    setTransactions([]);
+    setMilestones(DEFAULT_MILESTONES);
   };
 
   type StateSnapshot = {
@@ -636,7 +665,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const addBucket = (b: Omit<Bucket, "id">) => {
     recordSnapshot(`Add envelope: ${b.name}`);
-    setBuckets([...buckets, { ...b, id: crypto.randomUUID() }]);
+    setBuckets([...buckets, { ...b, id: safeRandomUUID() }]);
   };
 
   const removeBucket = (id: string) => {
@@ -653,7 +682,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const addSubscription = (s: Omit<Subscription, "id">) => {
     recordSnapshot(`Add subscription: ${s.name}`);
-    setSubscriptions([...subscriptions, { ...s, id: crypto.randomUUID() }]);
+    setSubscriptions([...subscriptions, { ...s, id: safeRandomUUID() }]);
   };
 
   const removeSubscription = (id: string) => {
@@ -667,7 +696,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   ) => {
     recordSnapshot(t.type === "expense" ? "Log expense" : "Add income");
     const date = t.date || new Date().toISOString();
-    setTransactions([{ ...t, id: crypto.randomUUID(), date }, ...transactions]);
+    setTransactions([{ ...t, id: safeRandomUUID(), date }, ...transactions]);
   };
 
   const removeTransaction = (id: string) => {
@@ -679,7 +708,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     recordSnapshot(`Add goal: ${m.title}`);
     setMilestones([
       ...milestones,
-      { ...m, id: crypto.randomUUID(), completed: false },
+      { ...m, id: safeRandomUUID(), completed: false },
     ]);
   };
 
@@ -743,6 +772,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       milestones.map((m) => ({
         ...m,
         targetAmount: r2(m.targetAmount * factor),
+      })),
+    );
+    setTransactions(
+      transactions.map((t) => ({
+        ...t,
+        amount: r2(t.amount * factor),
       })),
     );
     _setCurrency(newCurrency);
