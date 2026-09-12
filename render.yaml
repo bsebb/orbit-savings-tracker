@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: orbit-financial-os
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node server/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        value: Orbit <onboarding@resend.dev>

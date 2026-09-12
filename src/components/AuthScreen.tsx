@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useFinance } from "../context/FinanceContext";
+import { sendLoginCode, verifyLoginCode } from "../utils/api";
 import {
   Mail,
   ArrowRight,
@@ -24,25 +25,43 @@ export const AuthScreen = () => {
   const [countdown, setCountdown] = useState(30);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Generate a random 6-digit code
-  const generateAndSendCode = (targetEmail: string) => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setOtpCode(code);
+  // Generate and request email dispatch from backend
+  const generateAndSendCode = async (targetEmail: string) => {
     setDigits(["", "", "", "", "", ""]);
     setCountdown(30);
+    setLoading(true);
 
-    // Show Apple-style toast notification with the code
-    toast(`📬 Verification code sent to ${targetEmail}`, {
-      description: `Security Code: ${code} (Valid for 10 minutes)`,
-      duration: 10000,
-      action: {
-        label: "Auto-fill",
-        onClick: () => {
-          setDigits(code.split(""));
-          setTimeout(() => handleVerify(code), 200);
-        },
-      },
-    });
+    try {
+      const res = await sendLoginCode(targetEmail);
+      if (res.success) {
+        if (res.devCode) {
+          setOtpCode(res.devCode);
+          toast(`📬 Verification code ready for ${targetEmail}`, {
+            description: `Security Code: ${res.devCode} (Valid for 10 minutes)`,
+            duration: 10000,
+            action: {
+              label: "Auto-fill",
+              onClick: () => {
+                setDigits(res.devCode!.split(""));
+                setTimeout(() => handleVerify(res.devCode!), 200);
+              },
+            },
+          });
+        } else {
+          setOtpCode("");
+          toast.success(`Verification code sent to ${targetEmail}`, {
+            description:
+              "Check your inbox (and spam folder) for your 6-digit code.",
+          });
+        }
+      } else {
+        toast.error(res.message || "Failed to send verification code");
+      }
+    } catch {
+      toast.error("Network error requesting verification code");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Timer countdown for resend
@@ -53,7 +72,7 @@ export const AuthScreen = () => {
     }
   }, [step, countdown]);
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim();
     if (!cleanEmail) {
@@ -67,12 +86,8 @@ export const AuthScreen = () => {
       return;
     }
 
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setStep("code");
-      generateAndSendCode(cleanEmail);
-    }, 400);
+    setStep("code");
+    await generateAndSendCode(cleanEmail);
   };
 
   const handleDigitChange = (index: number, val: string) => {
@@ -112,19 +127,30 @@ export const AuthScreen = () => {
     }
   };
 
-  const handleVerify = (enteredCode: string) => {
+  const handleVerify = async (enteredCode: string) => {
     setLoading(true);
-    setTimeout(() => {
-      if (enteredCode === otpCode) {
+    try {
+      if (otpCode && enteredCode === otpCode) {
+        login(email.trim(), remember);
+        toast.success(`Welcome to Orbit, ${email.trim()}!`, { icon: "✨" });
+        setLoading(false);
+        return;
+      }
+
+      const res = await verifyLoginCode(email.trim(), enteredCode);
+      if (res.success) {
         login(email.trim(), remember);
         toast.success(`Welcome to Orbit, ${email.trim()}!`, { icon: "✨" });
       } else {
-        toast.error("Invalid verification code. Please check and try again.");
+        toast.error(res.message || "Invalid or expired verification code.");
         setDigits(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
+    } catch {
+      toast.error("Verification error. Please retry.");
+    } finally {
       setLoading(false);
-    }, 450);
+    }
   };
 
   return (
