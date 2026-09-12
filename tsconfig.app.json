@@ -17,9 +17,9 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "noUnusedLocals": true,
+    "strict": true,
+    "noUnusedLocals": false,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]

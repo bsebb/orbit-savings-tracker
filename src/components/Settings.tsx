@@ -2,7 +2,7 @@ import React from "react";
 import {
   useFinance,
   currencySymbols,
-  Currency,
+  type Currency,
 } from "../context/FinanceContext";
 import { Settings as SettingsIcon } from "lucide-react";
 
